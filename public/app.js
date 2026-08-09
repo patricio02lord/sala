@@ -6,7 +6,7 @@
 const $ = (id) => document.getElementById(id) || document.createElement("span");
 const escutar = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
 const ECRAS = ["v-app", "v-criar", "v-convite", "v-entrada", "v-fechado"];
-const CORES = ["#5a765f", "#7a6b59", "#5c6b80", "#785f76", "#6b7752", "#82665a"];
+const CORES = ["#293552", "#2f3350", "#26384e", "#332e4c", "#2b3a45", "#353046"];
 
 /** conversas activas nesta ligacao: code -> {chave, k, para, expira, msgs, novas, dono, ligada} */
 const vivas = new Map();
@@ -204,7 +204,7 @@ function desenharLista() {
   if (!v.length) {
     const p = document.createElement("p");
     p.className = "vazio-lista";
-    p.textContent = "Ainda não tens conversas. Começa uma e manda o link à pessoa.";
+    p.textContent = "Sem conversas. Gera um link para começar.";
     alvo.append(p);
     return;
   }
@@ -224,10 +224,10 @@ function desenharLista() {
     txt.className = "item-texto";
     const n = document.createElement("p");
     n.className = "item-nome";
-    n.textContent = sala.para || "À espera de alguém";
+    n.textContent = sala.para || "A aguardar convidado";
     const sub = document.createElement("p");
     sub.className = "item-sub";
-    sub.textContent = morta ? "terminada" : `termina daqui a ${restante(sala.expira)}`;
+    sub.textContent = morta ? "Terminada" : `Expira em ${restante(sala.expira)}`;
     txt.append(n, sub);
     txt.addEventListener("click", () => { if (!morta) abrirConversa(sala.code); });
 
@@ -242,7 +242,9 @@ function desenharLista() {
     const acao = document.createElement("button");
     acao.className = "item-acao";
     acao.setAttribute("aria-label", morta ? "Esquecer" : "Copiar link");
-    acao.textContent = morta ? "\u00d7" : "\u29c9";
+    acao.innerHTML = morta
+      ? '<svg viewBox="0 0 16 16" width="13" height="13"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>'
+      : '<svg viewBox="0 0 16 16" width="13" height="13"><path d="M6.5 9.5a2.5 2.5 0 003.5 0l2-2a2.5 2.5 0 10-3.5-3.5l-.7.7M9.5 6.5a2.5 2.5 0 00-3.5 0l-2 2a2.5 2.5 0 103.5 3.5l.7-.7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg>';
     acao.addEventListener("click", (e) => {
       e.stopPropagation();
       if (morta) { esquecerSala(sala.code); vivas.delete(sala.code); desenharLista(); return; }
@@ -383,7 +385,6 @@ function pintar(item, s) {
     const a = document.createElement("span");
     a.className = "autor";
     a.textContent = item.autor;
-    a.style.color = corDe(item.autor);
     balao.append(a);
   }
   const p = document.createElement("p");
@@ -413,7 +414,7 @@ function desenharConversa() {
 function desenharCabecalho() {
   const s = vivas.get(activa);
   const outro = s?.para || "";
-  $("titulo-sala").textContent = outro ? `Conversa com ${outro}` : "À espera de alguém";
+  $("titulo-sala").textContent = outro || "A aguardar convidado";
   $("avatar-sala").textContent = outro ? inicial(outro) : "·";
   $("avatar-sala").style.background = corDe(outro || activa);
 }
@@ -421,8 +422,8 @@ function desenharCabecalho() {
 function actualizarSub() {
   const s = vivas.get(activa);
   if (!s) return;
-  const p = s.pessoas === undefined ? "" : s.pessoas <= 1 ? "só tu · " : "2 pessoas · ";
-  $("conta").textContent = `${p}termina daqui a ${restante(s.expira)}`;
+  const p = s.pessoas === undefined ? "" : s.pessoas <= 1 ? "Só tu · " : "2 online · ";
+  $("conta").textContent = `${p}expira em ${restante(s.expira)}`;
 }
 
 async function abrirConversa(code) {
@@ -507,7 +508,7 @@ async function criarSala() {
   const n = ($("nome-criar").value.trim() || lerNome()).trim();
   if (!n) return erro("e-criar", "Escreve o teu nome primeiro.");
   $("b-criar").disabled = true;
-  $("b-criar").textContent = "A criar…";
+  $("b-criar").textContent = "A gerar…";
   try {
     nome = n; guardarNome(n);
     const chave = await gerarChave();
@@ -533,7 +534,7 @@ async function criarSala() {
     erro("e-criar", e.message || "Não foi possível criar a conversa.");
   } finally {
     $("b-criar").disabled = false;
-    $("b-criar").textContent = "Criar a conversa";
+    $("b-criar").textContent = "Gerar link";
   }
 }
 
@@ -634,7 +635,7 @@ function ecraChamada(estado, texto) {
   const emCurso = estado === "em-curso";
   $("chamada").classList.toggle("oculto", estado === "parado");
   $("chamada").classList.toggle("a-tocar", estado === "a-tocar" || estado === "a-chamar");
-  $("chamada-nome").textContent = emCurso ? `Em chamada com ${outro}` : outro;
+  $("chamada-nome").textContent = emCurso ? outro : `${outro} · chamada`;
   $("chamada-estado").textContent = texto || "";
   $("b-atender").classList.toggle("oculto", estado !== "a-tocar");
   $("b-silencio").classList.toggle("oculto", !emCurso);
