@@ -7,7 +7,7 @@ const ECRAS = ["v-criar", "v-convite", "v-entrada", "v-sala"];
 const CORES = ["#8a5a2b", "#2f4a3a", "#7a3f6d", "#2b5c7a", "#8a3b3b", "#4a5a24"];
 
 let chave = null, chaveTexto = "", codigo = "", nome = "", anfitriao = "";
-let ttl = "24h", socket = null, expiraEm = 0, jaEntrou = false;
+let ttl = "24h", socket = null, expiraEm = 0, jaEntrou = false, para = "";
 let ultimoAutor = null, ultimoElemento = null;
 
 /* ---------- Utilidades ---------- */
@@ -81,6 +81,105 @@ async function decifrar(texto) {
   return JSON.parse(new TextDecoder().decode(claro));
 }
 
+/* ---------- Arquivo local das minhas salas ---------- */
+
+const CHAVE_ARQ = "sala:minhas";
+
+function lerArquivo() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_ARQ) || "[]"); } catch { return []; }
+}
+function gravarArquivo(v) {
+  try { localStorage.setItem(CHAVE_ARQ, JSON.stringify(v.slice(0, 60))); } catch {}
+}
+function guardarSala(entrada) {
+  const v = lerArquivo().filter((x) => x.code !== entrada.code);
+  v.unshift(entrada);
+  gravarArquivo(v);
+}
+function esquecerSala(code) {
+  gravarArquivo(lerArquivo().filter((x) => x.code !== code));
+}
+
+function desenharLista() {
+  const v = lerArquivo();
+  const alvo = $("lista");
+  alvo.textContent = "";
+  $("meu-nome").textContent = lerNome() || "sem nome";
+
+  if (!v.length) {
+    const p = document.createElement("p");
+    p.className = "vazio-lista";
+    p.textContent = "Ainda não abriste nenhuma conversa. Cria uma e manda o link à pessoa.";
+    alvo.append(p);
+    return;
+  }
+
+  for (const sala of v) {
+    const morta = Date.now() > sala.expira;
+    const item = document.createElement("div");
+    item.className = "item" + (morta ? " morta" : "");
+
+    const av = document.createElement("div");
+    av.className = "item-avatar";
+    av.style.background = corDe(sala.para || sala.code);
+    av.textContent = inicial(sala.para || sala.code);
+
+    const txt = document.createElement("button");
+    txt.className = "item-texto";
+    txt.style.background = "none";
+    txt.style.border = "none";
+    txt.style.padding = "0";
+    const n = document.createElement("p");
+    n.className = "item-nome";
+    n.textContent = sala.para || `Sala ${sala.code}`;
+    const sub = document.createElement("p");
+    sub.className = "item-sub";
+    sub.textContent = morta ? "terminada" : `termina daqui a ${restante(sala.expira)}`;
+    txt.append(n, sub);
+    txt.addEventListener("click", () => (morta ? null : abrirGuardada(sala)));
+
+    const acao = document.createElement("button");
+    acao.className = "item-acao";
+    acao.setAttribute("aria-label", morta ? "Esquecer" : "Copiar link");
+    acao.textContent = morta ? "\u00d7" : "\u29c9";
+    acao.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (morta) {
+        esquecerSala(sala.code);
+        desenharLista();
+        return;
+      }
+      codigo = sala.code; chaveTexto = sala.k;
+      if (navigator.share) { await partilhar(); } else { await copiar(); }
+    });
+
+    item.append(av, txt, acao);
+    alvo.append(item);
+  }
+}
+
+async function abrirGuardada(sala) {
+  codigo = sala.code;
+  chaveTexto = sala.k;
+  para = sala.para || "";
+  nome = lerNome();
+  try { chave = await importarChave(chaveTexto); } catch { return avisar("Chave inválida"); }
+  try {
+    const r = await fetch(`/api/salas/${codigo}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.erro);
+    expiraEm = d.expiraEm;
+  } catch (e) {
+    avisar(e.message || "Esta conversa já não existe");
+    esquecerSala(codigo);
+    desenharLista();
+    return;
+  }
+  anfitriao = para;
+  history.replaceState(null, "", `/s/${codigo}#k=${chaveTexto}`);
+  ligar();
+}
+
 /* ---------- 1. Criar ---------- */
 
 document.querySelectorAll(".opcao").forEach((b) =>
@@ -94,8 +193,10 @@ document.querySelectorAll(".opcao").forEach((b) =>
 );
 
 async function criarSala() {
-  const n = $("nome-criar").value.trim();
+  const n = ($("nome-criar").value.trim() || lerNome()).trim();
+  const destino = $("para-criar").value.trim();
   if (!n) return erro("e-criar", "Escreve o teu nome primeiro.");
+  if (!destino) return erro("e-criar", "Escreve o nome de quem vai receber o link.");
   $("b-criar").disabled = true;
   $("b-criar").textContent = "A abrir…";
   try {
@@ -106,12 +207,14 @@ async function criarSala() {
     const r = await fetch("/api/salas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ttl, anfitriao: await cifrar({ nome: n }) }),
+      body: JSON.stringify({ ttl, limite: 2, anfitriao: await cifrar({ nome: n }) }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
 
-    codigo = d.code; expiraEm = d.expiraEm;
+    codigo = d.code; expiraEm = d.expiraEm; para = destino;
+    guardarSala({ code: codigo, k: chaveTexto, para: destino, expira: expiraEm });
+    $("para-convite").textContent = `a ${destino}`;
     $("cod-convite").textContent = codigo;
     $("link-sala").textContent = linkDaSala();
     history.replaceState(null, "", `/s/${codigo}#k=${chaveTexto}`);
@@ -121,18 +224,18 @@ async function criarSala() {
     erro("e-criar", e.message || "Não foi possível abrir a sala.");
   } finally {
     $("b-criar").disabled = false;
-    $("b-criar").textContent = "Abrir a minha sala";
+    $("b-criar").textContent = "Criar a conversa";
   }
 }
 
 $("b-criar").addEventListener("click", criarSala);
-$("nome-criar").addEventListener("keydown", (e) => e.key === "Enter" && criarSala());
+$("para-criar").addEventListener("keydown", (e) => e.key === "Enter" && criarSala());
 
 /* ---------- 2. Convite ---------- */
 
 async function partilhar() {
   try {
-    await navigator.share({ title: "Sala", text: `Entra na minha sala. O link expira.`, url: linkDaSala() });
+    await navigator.share({ title: "Sala", text: `Conversa privada${para ? " para " + para : ""}. Este link expira.`, url: linkDaSala() });
   } catch {}
 }
 
@@ -280,9 +383,11 @@ function actualizarSub(n) {
 function ligar() {
   if (!chave || !codigo) return;
   mostrar("v-sala");
-  const titulo = anfitriao ? `Sala do ${anfitriao}` : `Sala ${codigo}`;
+  const outro = para || anfitriao;
+  const titulo = outro ? `Conversa com ${outro}` : `Sala ${codigo}`;
   $("titulo-sala").textContent = titulo;
-  $("avatar-sala").textContent = inicial(anfitriao || codigo);
+  $("avatar-sala").textContent = inicial(outro || codigo);
+  $("avatar-sala").style.background = corDe(outro || codigo);
   actualizarSub();
   ajustarAltura();
 
@@ -360,6 +465,7 @@ $("b-menu").addEventListener("click", (e) => { e.stopPropagation(); menu.classLi
 document.addEventListener("click", () => menu.classList.add("oculto"));
 $("b-convidar").addEventListener("click", () => (navigator.share ? partilhar() : copiar()));
 $("b-sair").addEventListener("click", () => { socket?.disconnect(); location.href = "/"; });
+
 $("b-fechar").addEventListener("click", () => {
   if (confirm("Isto apaga a sala para toda a gente. Continuar?")) {
     socket?.emit("fechar");
@@ -367,7 +473,49 @@ $("b-fechar").addEventListener("click", () => {
   }
 });
 
+/* ---------- Navegação ---------- */
+
+function irParaLista() {
+  history.replaceState(null, "", "/");
+  desenharLista();
+  mostrar("v-lista");
+}
+
+function irParaCriar() {
+  const meu = lerNome();
+  $("campo-eu").classList.toggle("oculto", !!meu);
+  $("nome-criar").value = meu;
+  $("para-criar").value = "";
+  $("b-voltar").classList.toggle("oculto", !lerArquivo().length);
+  erro("e-criar", "");
+  mostrar("v-criar");
+  (meu ? $("para-criar") : $("nome-criar")).focus();
+}
+
+$("b-nova").addEventListener("click", irParaCriar);
+$("b-voltar").addEventListener("click", irParaLista);
+$("b-lista").addEventListener("click", irParaLista);
+$("b-eu").addEventListener("click", () => {
+  const novo = prompt("O teu nome:", lerNome());
+  if (novo && novo.trim()) { guardarNome(novo.trim().slice(0, 20)); desenharLista(); }
+});
+
 /* ---------- Arranque ---------- */
 
-if (location.pathname.startsWith("/s/")) prepararEntrada();
-else { $("nome-criar").value = lerNome(); mostrar("v-criar"); }
+if (location.pathname.startsWith("/s/")) {
+  const meu = location.hash.includes("k=") && lerArquivo().some(
+    (x) => x.code === (location.pathname.split("/s/")[1] || "").toUpperCase()
+  );
+  if (meu) {
+    const guardada = lerArquivo().find(
+      (x) => x.code === (location.pathname.split("/s/")[1] || "").toUpperCase()
+    );
+    abrirGuardada(guardada);
+  } else {
+    prepararEntrada();
+  }
+} else if (lerArquivo().length) {
+  irParaLista();
+} else {
+  irParaCriar();
+}
