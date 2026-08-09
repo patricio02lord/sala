@@ -1,22 +1,64 @@
 /* Sala — cliente.
-   A chave AES-GCM vive no fragmento do URL (#k=...). O browser nunca envia
-   fragmentos ao servidor, por isso o servidor só vê texto cifrado. */
+   A chave AES-GCM vive no fragmento do URL (#k=...). Os browsers nunca enviam
+   fragmentos ao servidor, por isso o servidor so ve texto cifrado. */
 
 const $ = (id) => document.getElementById(id);
-const vistas = { porta: $("porta"), convite: $("convite"), sala: $("sala") };
+const ECRAS = ["v-criar", "v-convite", "v-entrada", "v-sala"];
 
 let chave = null;
-let codigo = null;
+let chaveTexto = "";
+let codigo = "";
 let nome = "";
 let ttl = "24h";
 let socket = null;
 let expiraEm = 0;
+let jaEntrou = false;
 
-/* ---------- Chave e cifra ---------- */
+/* ---------- Utilidades ---------- */
+
+function mostrar(id) {
+  ECRAS.forEach((e) => $(e).classList.toggle("oculto", e !== id));
+}
+
+const erro = (id, txt) => ($(id).textContent = txt || "");
+
+const horas = (t) =>
+  new Date(t).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+
+function restante(ate) {
+  const s = Math.max(0, ate - Date.now()) / 1000;
+  if (s < 60) return "menos de um minuto";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h >= 24) return `${Math.floor(h / 24)} dia${h >= 48 ? "s" : ""}`;
+  if (h >= 1) return `${h}h ${m}m`;
+  return `${m} minutos`;
+}
+
+let avisoTimer;
+function avisar(txt) {
+  const el = $("aviso");
+  el.textContent = txt;
+  el.classList.remove("oculto");
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => el.classList.add("oculto"), 2400);
+}
+
+const guardarNome = (n) => {
+  try { sessionStorage.setItem("sala:nome", n); } catch {}
+};
+const lerNome = () => {
+  try { return sessionStorage.getItem("sala:nome") || ""; } catch { return ""; }
+};
+
+const linkDaSala = () => `${location.origin}/s/${codigo}#k=${chaveTexto}`;
+
+/* ---------- Cifra ---------- */
 
 const b64u = {
   para: (buf) =>
-    btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+    btoa(String.fromCharCode(...new Uint8Array(buf)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
   de: (s) => {
     const b = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
     return Uint8Array.from(b, (c) => c.charCodeAt(0));
@@ -33,8 +75,9 @@ const importarChave = (s) =>
 
 async function cifrar(objeto) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const dados = new TextEncoder().encode(JSON.stringify(objeto));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, chave, dados);
+  const ct = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv }, chave, new TextEncoder().encode(JSON.stringify(objeto))
+  );
   const junto = new Uint8Array(iv.length + ct.byteLength);
   junto.set(iv);
   junto.set(new Uint8Array(ct), iv.length);
@@ -43,28 +86,13 @@ async function cifrar(objeto) {
 
 async function decifrar(texto) {
   const bytes = b64u.de(texto);
-  const iv = bytes.slice(0, 12);
-  const ct = bytes.slice(12);
-  const claro = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, chave, ct);
+  const claro = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: bytes.slice(0, 12) }, chave, bytes.slice(12)
+  );
   return JSON.parse(new TextDecoder().decode(claro));
 }
 
-/* ---------- Vistas ---------- */
-
-function mostrar(qual) {
-  for (const [n, el] of Object.entries(vistas)) el.classList.toggle("oculto", n !== qual);
-}
-
-const erro = (el, txt) => ($(el).textContent = txt || "");
-
-const horas = (t) =>
-  new Date(t).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-
-function linkDaSala(code, chaveExportada) {
-  return `${location.origin}/s/${code}#k=${chaveExportada}`;
-}
-
-/* ---------- Porta ---------- */
+/* ---------- 1. Criar ---------- */
 
 document.querySelectorAll(".opcao").forEach((b) =>
   b.addEventListener("click", () => {
@@ -78,85 +106,143 @@ document.querySelectorAll(".opcao").forEach((b) =>
   })
 );
 
-$("abrir").addEventListener("click", async () => {
-  nome = $("nome").value.trim();
-  if (!nome) return erro("erro-porta", "Escolhe um nome para esta sala.");
-  $("abrir").disabled = true;
+async function criarSala() {
+  const n = $("nome-criar").value.trim();
+  if (!n) return erro("e-criar", "Escreve um nome primeiro.");
+  $("b-criar").disabled = true;
+  $("b-criar").textContent = "A abrir…";
   try {
     const r = await fetch("/api/salas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ttl }),
     });
-    const dados = await r.json();
-    if (!r.ok) throw new Error(dados.erro);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.erro);
 
+    nome = n;
+    guardarNome(n);
     chave = await gerarChave();
-    const exportada = await exportarChave(chave);
-    codigo = dados.code;
-    expiraEm = dados.expiraEm;
+    chaveTexto = await exportarChave(chave);
+    codigo = d.code;
+    expiraEm = d.expiraEm;
 
-    const link = linkDaSala(codigo, exportada);
-    $("link-sala").textContent = link;
-    history.replaceState(null, "", `/s/${codigo}#k=${exportada}`);
-    erro("erro-porta", "");
-    mostrar("convite");
+    $("cod-convite").textContent = codigo;
+    $("link-sala").textContent = linkDaSala();
+    history.replaceState(null, "", `/s/${codigo}#k=${chaveTexto}`);
+    erro("e-criar", "");
+    mostrar("v-convite");
   } catch (e) {
-    erro("erro-porta", e.message || "Não foi possível abrir a sala.");
+    erro("e-criar", e.message || "Não foi possível abrir a sala.");
   } finally {
-    $("abrir").disabled = false;
-  }
-});
-
-$("entrar").addEventListener("click", () => {
-  nome = $("nome").value.trim();
-  if (!nome) return erro("erro-porta", "Escolhe um nome para esta sala.");
-  const c = $("codigo").value.trim().toUpperCase();
-  if (c.length !== 6) return erro("erro-porta", "O código tem 6 caracteres.");
-  if (!location.hash.includes("k=")) {
-    return erro(
-      "erro-porta",
-      "Só com o código não dá: precisas do link completo, com a chave depois do #."
-    );
-  }
-  location.href = `/s/${c}${location.hash}`;
-});
-
-$("codigo").addEventListener("keydown", (e) => e.key === "Enter" && $("entrar").click());
-$("nome").addEventListener("keydown", (e) => e.key === "Enter" && $("abrir").click());
-
-/* ---------- Convite ---------- */
-
-async function copiarLink(botao, textoOriginal) {
-  const link = $("link-sala").textContent || linkDaSala(codigo, await exportarChave(chave));
-  try {
-    await navigator.clipboard.writeText(link);
-    botao.textContent = "copiado";
-    setTimeout(() => (botao.textContent = textoOriginal), 2000);
-  } catch {
-    prompt("Copia este link:", link);
+    $("b-criar").disabled = false;
+    $("b-criar").textContent = "Abrir uma sala";
   }
 }
 
-$("copiar").addEventListener("click", (e) => copiarLink(e.target, "Copiar link"));
-$("copiar-topo").addEventListener("click", (e) => copiarLink(e.target, "copiar link"));
-$("ir").addEventListener("click", () => ligar());
+$("b-criar").addEventListener("click", criarSala);
+$("nome-criar").addEventListener("keydown", (e) => e.key === "Enter" && criarSala());
 
-/* ---------- Sala ---------- */
+/* ---------- 2. Convite ---------- */
 
-function acrescentarSistema(texto) {
+async function partilhar() {
+  const dados = {
+    title: "Sala",
+    text: "Entra nesta sala comigo. O link expira.",
+    url: linkDaSala(),
+  };
+  try {
+    await navigator.share(dados);
+  } catch {
+    /* cancelado pelo utilizador */
+  }
+}
+
+async function copiar() {
+  try {
+    await navigator.clipboard.writeText(linkDaSala());
+    avisar("Link copiado");
+  } catch {
+    const c = $("link-sala");
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.selectNodeContents(c);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    avisar("Copia o link selecionado");
+  }
+}
+
+if (navigator.share) $("b-partilhar").classList.remove("oculto");
+$("b-partilhar").addEventListener("click", partilhar);
+$("b-copiar").addEventListener("click", copiar);
+$("b-entrar-minha").addEventListener("click", () => ligar());
+$("b-convidar").addEventListener("click", () => (navigator.share ? partilhar() : copiar()));
+
+/* ---------- 3. Entrada por convite ---------- */
+
+async function prepararEntrada() {
+  codigo = (location.pathname.split("/s/")[1] || "").toUpperCase().slice(0, 6);
+  chaveTexto = new URLSearchParams(location.hash.slice(1)).get("k") || "";
+  $("cod-entrada").textContent = codigo || "?";
+  mostrar("v-entrada");
+
+  if (!codigo || !chaveTexto) {
+    $("info-entrada").textContent =
+      "Este link está incompleto. Pede o link inteiro a quem abriu a sala — tem de incluir a parte depois do #.";
+    return;
+  }
+
+  try {
+    chave = await importarChave(chaveTexto);
+  } catch {
+    $("info-entrada").textContent = "A chave deste link não é válida.";
+    return;
+  }
+
+  try {
+    const r = await fetch(`/api/salas/${codigo}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.erro);
+    expiraEm = d.expiraEm;
+    $("info-entrada").textContent = `A sala está aberta e desaparece daqui a ${restante(expiraEm)}. Escolhe um nome e entra.`;
+    $("nome-entrada").value = lerNome();
+    $("form-entrada").classList.remove("oculto");
+    $("nome-entrada").focus();
+  } catch (e) {
+    $("info-entrada").textContent = e.message || "Não foi possível confirmar esta sala.";
+  }
+}
+
+function entrarPorConvite() {
+  const n = $("nome-entrada").value.trim();
+  if (!n) return erro("e-entrada", "Escreve um nome primeiro.");
+  nome = n;
+  guardarNome(n);
+  erro("e-entrada", "");
+  $("b-entrar").disabled = true;
+  $("b-entrar").textContent = "A ligar…";
+  ligar();
+}
+
+$("b-entrar").addEventListener("click", entrarPorConvite);
+$("nome-entrada").addEventListener("keydown", (e) => e.key === "Enter" && entrarPorConvite());
+
+/* ---------- 4. Sala ---------- */
+
+function sistema(txt) {
   const p = document.createElement("p");
   p.className = "sistema";
-  p.textContent = texto;
+  p.textContent = txt;
   $("mensagens").append(p);
-  $("fim").scrollIntoView({ behavior: "smooth" });
+  $("fim").scrollIntoView({ block: "end" });
 }
 
 async function acrescentar(msg) {
   $("vazio").classList.add("oculto");
   const div = document.createElement("div");
   div.className = "msg";
-  let autor = "?";
+  let autor = "—";
   let corpo = "";
   try {
     const claro = await decifrar(msg.ct);
@@ -165,102 +251,117 @@ async function acrescentar(msg) {
     if (autor === nome) div.classList.add("minha");
   } catch {
     div.classList.add("ilegivel");
-    autor = "—";
     corpo = "mensagem cifrada com outra chave";
   }
-  div.innerHTML = `<div class="cabeca"><span class="autor"></span><span class="hora"></span></div><p class="corpo"></p>`;
+  div.innerHTML = '<div class="cabeca"><span class="autor"></span><span class="hora"></span></div><p class="corpo"></p>';
   div.querySelector(".autor").textContent = autor;
   div.querySelector(".hora").textContent = horas(msg.t);
   div.querySelector(".corpo").textContent = corpo;
   div.dataset.t = msg.t;
   $("mensagens").append(div);
-  $("fim").scrollIntoView({ behavior: "smooth" });
+  $("fim").scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
 function desvanecer() {
   const agora = Date.now();
   document.querySelectorAll(".msg").forEach((m) => {
     const nascida = Number(m.dataset.t);
-    const restante = expiraEm - nascida;
-    if (restante <= 0) return;
-    const idade = (agora - nascida) / restante;
-    m.style.opacity = String(Math.max(0.3, 1 - idade * 0.8));
+    const vida = expiraEm - nascida;
+    if (vida <= 0) return;
+    m.style.opacity = String(Math.max(0.32, 1 - ((agora - nascida) / vida) * 0.8));
   });
 }
 
-async function ligar() {
-  const params = new URLSearchParams(location.hash.slice(1));
-  const k = params.get("k");
-  codigo = location.pathname.split("/s/")[1]?.toUpperCase() || codigo;
+function actualizarConta() {
+  if (!expiraEm) return;
+  $("conta").textContent = `desaparece daqui a ${restante(expiraEm)}`;
+}
 
-  if (!k || !codigo) {
-    mostrar("porta");
-    return erro("erro-porta", "Este link está incompleto. Pede o link inteiro a quem abriu a sala.");
-  }
+function ligar() {
+  if (!chave || !codigo) return;
+  mostrar("v-sala");
+  $("cod-sala").textContent = codigo;
+  $("estado").classList.add("fora");
 
-  try {
-    chave = await importarChave(k);
-  } catch {
-    mostrar("porta");
-    return erro("erro-porta", "A chave deste link é inválida.");
-  }
+  if (!socket) {
+    socket = io({ transports: ["websocket", "polling"] });
 
-  if (!nome) {
-    nome = (prompt("O teu nome aqui dentro:") || "").trim().slice(0, 20);
-    if (!nome) {
-      mostrar("porta");
-      return;
-    }
-  }
-
-  socket = io({ transports: ["websocket", "polling"] });
-
-  socket.on("connect", () => {
-    socket.emit("entrar", { code: codigo }, async (r) => {
-      if (!r?.ok) {
-        mostrar("porta");
-        return erro("erro-porta", r?.erro || "Não foi possível entrar.");
-      }
-      expiraEm = r.expiraEm;
-      $("codigo-sala").textContent = codigo;
-      const d = new Date(expiraEm);
-      $("expira").textContent = `desaparece ${d.toLocaleDateString("pt-PT")} às ${horas(expiraEm)}`;
-      $("mensagens").textContent = "";
-      $("vazio").classList.toggle("oculto", r.historico.length > 0);
-      for (const m of r.historico) await acrescentar(m);
-      mostrar("sala");
-      $("texto").focus();
+    socket.on("connect", () => {
+      socket.emit("entrar", { code: codigo }, async (r) => {
+        if (!r?.ok) {
+          socket.disconnect();
+          socket = null;
+          mostrar("v-entrada");
+          $("form-entrada").classList.add("oculto");
+          $("info-entrada").textContent = r?.erro || "Não foi possível entrar.";
+          $("b-entrar").disabled = false;
+          $("b-entrar").textContent = "Entrar na sala";
+          return;
+        }
+        expiraEm = r.expiraEm;
+        $("estado").classList.remove("fora");
+        actualizarConta();
+        $("mensagens").textContent = "";
+        $("vazio").classList.toggle("oculto", r.historico.length > 0);
+        for (const m of r.historico) await acrescentar(m);
+        if (jaEntrou) sistema("Ligação recuperada.");
+        jaEntrou = true;
+        $("texto").focus();
+      });
     });
-  });
 
-  socket.on("mensagem", (m) => acrescentar(m));
-  socket.on("presenca", ({ n }) => ($("presenca").textContent = n === 1 ? "só tu" : `${n} pessoas`));
-  socket.on("sala:fechada", ({ motivo }) => {
-    acrescentarSistema(motivo);
-    $("texto").disabled = true;
-    $("enviar").disabled = true;
-  });
-  socket.on("disconnect", () => acrescentarSistema("Ligação perdida. A tentar voltar."));
+    socket.on("mensagem", acrescentar);
+    socket.on("presenca", ({ n }) => {
+      $("conta").textContent = `${n === 1 ? "só tu" : n + " pessoas"} · desaparece daqui a ${restante(expiraEm)}`;
+    });
+    socket.on("sala:fechada", ({ motivo }) => {
+      sistema(motivo);
+      $("texto").disabled = true;
+      $("b-enviar").disabled = true;
+      $("estado").classList.add("fora");
+    });
+    socket.on("disconnect", () => {
+      $("estado").classList.add("fora");
+      $("conta").textContent = "sem ligação · a tentar voltar";
+    });
 
-  setInterval(desvanecer, 30_000);
+    setInterval(() => { desvanecer(); actualizarConta(); }, 30000);
+  }
 }
 
 async function enviar() {
   const txt = $("texto").value.trim();
-  if (!txt || !socket?.connected) return;
+  if (!txt) return;
+  if (!socket?.connected) return erro("e-sala", "Sem ligação. Espera um instante.");
   $("texto").value = "";
+  $("texto").style.height = "auto";
   try {
-    const ct = await cifrar({ n: nome, txt });
-    socket.emit("mensagem", { ct }, (r) => erro("erro-sala", r?.ok ? "" : r?.erro));
+    socket.emit("mensagem", { ct: await cifrar({ n: nome, txt }) }, (r) =>
+      erro("e-sala", r?.ok ? "" : r?.erro)
+    );
   } catch {
-    erro("erro-sala", "Não foi possível cifrar a mensagem.");
+    erro("e-sala", "Não foi possível cifrar a mensagem.");
   }
 }
 
-$("enviar").addEventListener("click", enviar);
-$("texto").addEventListener("keydown", (e) => e.key === "Enter" && enviar());
-$("sair").addEventListener("click", () => (location.href = "/"));
-$("fechar").addEventListener("click", () => {
+$("b-enviar").addEventListener("click", enviar);
+$("texto").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    enviar();
+  }
+});
+$("texto").addEventListener("input", (e) => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(e.target.scrollHeight, 130) + "px";
+});
+
+$("b-sair").addEventListener("click", () => {
+  socket?.disconnect();
+  location.href = "/";
+});
+
+$("b-fechar").addEventListener("click", () => {
   if (confirm("Fechar a sala apaga tudo para toda a gente. Continuar?")) {
     socket?.emit("fechar");
     setTimeout(() => (location.href = "/"), 400);
@@ -269,5 +370,9 @@ $("fechar").addEventListener("click", () => {
 
 /* ---------- Arranque ---------- */
 
-if (location.pathname.startsWith("/s/")) ligar();
-else mostrar("porta");
+if (location.pathname.startsWith("/s/")) {
+  prepararEntrada();
+} else {
+  $("nome-criar").value = lerNome();
+  mostrar("v-criar");
+}
