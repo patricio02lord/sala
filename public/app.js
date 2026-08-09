@@ -2,7 +2,8 @@
    A chave AES-GCM vive no fragmento do URL (#k=...). Os browsers nunca enviam
    fragmentos ao servidor, por isso o servidor so ve texto cifrado. */
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id) || document.createElement("span");
+const escutar = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
 const ECRAS = ["v-criar", "v-convite", "v-entrada", "v-sala"];
 const CORES = ["#ffffff", "#c9c9c9", "#a0a0a0", "#7d7d7d", "#e0e0e0", "#8e8e8e"];
 
@@ -232,8 +233,8 @@ async function criarSala() {
   }
 }
 
-$("b-criar").addEventListener("click", criarSala);
-$("nome-criar").addEventListener("keydown", (e) => e.key === "Enter" && criarSala());
+escutar("b-criar", "click", criarSala);
+escutar("nome-criar", "keydown", (e) => e.key === "Enter" && criarSala());
 
 /* ---------- 2. Convite ---------- */
 
@@ -256,9 +257,9 @@ async function copiar() {
 }
 
 if (navigator.share) $("b-partilhar").classList.remove("oculto");
-$("b-partilhar").addEventListener("click", partilhar);
-$("b-copiar").addEventListener("click", copiar);
-$("b-entrar-minha").addEventListener("click", () => ligar());
+escutar("b-partilhar", "click", partilhar);
+escutar("b-copiar", "click", copiar);
+escutar("b-entrar-minha", "click", () => ligar());
 
 /* ---------- 3. Boas-vindas ---------- */
 
@@ -316,8 +317,8 @@ function entrarPorConvite() {
   ligar();
 }
 
-$("b-entrar").addEventListener("click", entrarPorConvite);
-$("nome-entrada").addEventListener("keydown", (e) => e.key === "Enter" && entrarPorConvite());
+escutar("b-entrar", "click", entrarPorConvite);
+escutar("nome-entrada", "keydown", (e) => e.key === "Enter" && entrarPorConvite());
 
 /* ---------- 4. Sala ---------- */
 
@@ -474,24 +475,24 @@ async function enviar() {
   }
 }
 
-$("b-enviar").addEventListener("click", enviar);
-$("texto").addEventListener("keydown", (e) => {
+escutar("b-enviar", "click", enviar);
+escutar("texto", "keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
 });
-$("texto").addEventListener("input", (e) => {
+escutar("texto", "input", (e) => {
   e.target.style.height = "auto";
   e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
 });
-$("texto").addEventListener("focus", () => setTimeout(() => aoFundo(false), 250));
+escutar("texto", "focus", () => setTimeout(() => aoFundo(false), 250));
 
 /* Menu */
 const menu = $("menu");
-$("b-menu").addEventListener("click", (e) => { e.stopPropagation(); menu.classList.toggle("oculto"); });
+escutar("b-menu", "click", (e) => { e.stopPropagation(); menu.classList.toggle("oculto"); });
 document.addEventListener("click", () => menu.classList.add("oculto"));
-$("b-convidar").addEventListener("click", () => (navigator.share ? partilhar() : copiar()));
-$("b-sair").addEventListener("click", () => { socket?.disconnect(); location.href = "/"; });
+escutar("b-convidar", "click", () => (navigator.share ? partilhar() : copiar()));
+escutar("b-sair", "click", () => { socket?.disconnect(); location.href = "/"; });
 
-$("b-fechar").addEventListener("click", () => {
+escutar("b-fechar", "click", () => {
   if (confirm("Isto apaga a sala para toda a gente. Continuar?")) {
     socket?.emit("fechar");
     setTimeout(() => (location.href = "/"), 400);
@@ -516,16 +517,33 @@ function irParaCriar() {
   $("nome-criar").focus();
 }
 
-$("b-nova").addEventListener("click", irParaCriar);
-$("b-voltar").addEventListener("click", irParaLista);
-$("b-lista").addEventListener("click", irParaLista);
-$("b-eu").addEventListener("click", () => {
+escutar("b-nova", "click", irParaCriar);
+escutar("b-voltar", "click", irParaLista);
+escutar("b-lista", "click", irParaLista);
+escutar("b-eu", "click", () => {
   const novo = prompt("O teu nome:", lerNome());
   if (novo && novo.trim()) { guardarNome(novo.trim().slice(0, 20)); desenharLista(); }
 });
 
 /* ---------- Arranque ---------- */
 
+window.addEventListener("error", (e) => {
+  const alvo = document.getElementById("v-criar");
+  if (alvo && document.querySelectorAll(".ecra:not(.oculto), .sala:not(.oculto)").length === 0) {
+    alvo.classList.remove("oculto");
+    const p = document.getElementById("e-criar");
+    if (p) p.textContent = "Algo falhou ao carregar: " + (e.message || "erro desconhecido");
+  }
+});
+
+try {
+  arrancar();
+} catch (e) {
+  console.error(e);
+  document.getElementById("v-criar")?.classList.remove("oculto");
+}
+
+function arrancar() {
 if (location.pathname.startsWith("/s/")) {
   const meu = location.hash.includes("k=") && lerArquivo().some(
     (x) => x.code === (location.pathname.split("/s/")[1] || "").toUpperCase()
@@ -542,4 +560,5 @@ if (location.pathname.startsWith("/s/")) {
   irParaLista();
 } else {
   irParaCriar();
+}
 }
