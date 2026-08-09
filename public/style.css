@@ -450,3 +450,9 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
   .chamada-b { padding: 9px 12px; font-size: 13px; }
   .chamada-nome { font-size: 14px; }
 }
+
+/* ---------- Espaço fechado ---------- */
+
+.bloco-dono { margin-top: 26px; }
+#b-sou-dono { display: inline-block; margin-top: 8px; }
+.ecra.centrado .marca-icone.grande { margin: 0 auto 26px; display: block; }
