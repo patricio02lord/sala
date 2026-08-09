@@ -318,3 +318,55 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
 
 @media (min-width: 600px) { .balao { max-width: 66%; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- Chamada ---------- */
+
+.chamada {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(246, 247, 244, 0.9);
+  backdrop-filter: blur(18px);
+  animation: respirar 0.3s ease both;
+}
+
+.chamada-cartao {
+  width: 100%; max-width: 330px; text-align: center;
+  background: var(--superficie);
+  border: 1px solid var(--linha);
+  border-radius: 26px;
+  padding: 38px 26px 28px;
+  box-shadow: 0 18px 50px rgba(44, 51, 46, 0.12);
+}
+
+.chamada-cartao .avatar {
+  width: 84px; height: 84px; font-size: 34px; margin-bottom: 20px;
+  color: #fff;
+}
+.chamada.a-tocar .chamada-cartao .avatar { animation: chamar 1.8s ease-in-out infinite; }
+@keyframes chamar {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(90, 118, 95, 0.28); }
+  50% { box-shadow: 0 0 0 16px rgba(90, 118, 95, 0); }
+}
+
+.chamada-nome {
+  font-family: var(--serif); font-size: 24px; font-weight: 300;
+  margin: 0 0 6px; color: var(--tinta);
+}
+.chamada-estado {
+  font-size: 14px; color: var(--suave); margin: 0 0 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chamada-botoes { display: flex; flex-direction: column; gap: 10px; }
+.chamada-botoes button { width: 100%; }
+
+.desligar {
+  padding: 16px 26px; font-size: 15px; font-weight: 500;
+  background: #a35a4e; color: #fff; border-radius: 14px;
+  transition: background 0.25s, transform 0.12s;
+}
+.desligar:hover { background: #8c4c42; }
+.desligar:active { transform: scale(0.99); }
+
+.silenciado { background: var(--veu) !important; color: var(--tinta) !important; }
