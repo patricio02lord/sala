@@ -12,7 +12,8 @@ const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem I, O, 0, 1
 const TTLS = { "1h": 60, "24h": 1440, "7d": 10080 };
 
 const MAX_SALAS = 5000;
-const MAX_PESSOAS = 20;
+const MAX_PESSOAS = 20;      // tecto absoluto
+const LIMITE_PADRAO = 2;     // conversa privada, so duas pessoas
 const MAX_HISTORICO = 200;
 const MAX_PAYLOAD = 8000; // bytes de texto cifrado
 const CRIAR_POR_IP = { max: 20, janela: 60 * 60 * 1000 };
@@ -79,6 +80,10 @@ app.post("/api/salas", (req, res) => {
     return res.status(429).json({ erro: "Abriste salas a mais. Espera uma hora." });
   }
   const ttlMin = TTLS[req.body?.ttl] ?? TTLS["24h"];
+  const limite = Math.min(
+    MAX_PESSOAS,
+    Math.max(2, Number.parseInt(req.body?.limite, 10) || LIMITE_PADRAO)
+  );
   const anfitriao =
     typeof req.body?.anfitriao === "string" && req.body.anfitriao.length <= 800
       ? req.body.anfitriao
@@ -89,6 +94,7 @@ app.post("/api/salas", (req, res) => {
     criadaEm: Date.now(),
     expiraEm: Date.now() + ttlMin * 60_000,
     anfitriao, // texto cifrado no browser: o servidor não o lê
+    limite,
     msgs: [],
   });
   res.json({ code, expiraEm: salas.get(code).expiraEm });
@@ -116,7 +122,9 @@ io.on("connection", (socket) => {
     if (!s) return ack?.({ ok: false, erro: "Essa sala não existe ou já expirou." });
 
     const dentro = io.sockets.adapter.rooms.get(c)?.size ?? 0;
-    if (dentro >= MAX_PESSOAS) return ack?.({ ok: false, erro: "A sala está cheia." });
+    if (dentro >= (s.limite || MAX_PESSOAS)) {
+      return ack?.({ ok: false, erro: "Esta sala já está ocupada." });
+    }
 
     salaAtual = c;
     await socket.join(c);
