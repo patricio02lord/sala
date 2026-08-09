@@ -62,6 +62,20 @@
         </div>
       </header>
 
+      <div id="chamada" class="chamada oculto" role="status">
+        <span class="chamada-ponto" aria-hidden="true"></span>
+        <div class="chamada-info">
+          <p id="chamada-nome" class="chamada-nome"></p>
+          <p id="chamada-estado" class="chamada-estado"></p>
+        </div>
+        <div class="chamada-botoes">
+          <button id="b-atender" class="chamada-b aceitar oculto">Atender</button>
+          <button id="b-silencio" class="chamada-b oculto">Silenciar</button>
+          <button id="b-desligar" class="chamada-b parar">Desligar</button>
+        </div>
+        <audio id="audio-remoto" autoplay playsinline></audio>
+      </div>
+
       <section id="fluxo">
         <div class="col-larga">
           <div id="cifra-nota" class="cifra-nota">S&oacute; voc&ecirc;s os dois. Cifrado ponta a ponta.</div>
@@ -151,21 +165,6 @@
     <p id="e-entrada" class="erro centro" role="alert"></p>
   </div>
 </main>
-
-<!-- CHAMADA -->
-<div id="chamada" class="chamada oculto" role="dialog" aria-label="Chamada">
-  <div class="chamada-cartao">
-    <div class="avatar" id="chamada-avatar">&middot;</div>
-    <p id="chamada-nome" class="chamada-nome"></p>
-    <p id="chamada-estado" class="chamada-estado"></p>
-    <div class="chamada-botoes">
-      <button id="b-atender" class="principal oculto">Atender</button>
-      <button id="b-silencio" class="secundaria oculto">Silenciar</button>
-      <button id="b-desligar" class="desligar">Desligar</button>
-    </div>
-  </div>
-  <audio id="audio-remoto" autoplay playsinline></audio>
-</div>
 
 <div id="aviso" class="aviso oculto" role="status"></div>
 
