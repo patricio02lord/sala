@@ -3,17 +3,18 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#EFEDE8" />
+<meta name="theme-color" content="#0D0B0A" />
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Sala</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232F4A3A'/><rect x='10' y='11' width='12' height='8' rx='2' fill='%23EFEDE8'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230D0B0A'/><circle cx='16' cy='17' r='5' fill='%23D9743A'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+<div class="brasa" aria-hidden="true"></div>
 
 <!-- 0. AS MINHAS SALAS -->
 <main id="v-lista" class="ecra topo oculto">
@@ -22,10 +23,10 @@
       <div class="marca"><span class="marca-icone"></span>Sala</div>
       <button id="b-eu" class="ligacao-peq">eu: <span id="meu-nome"></span></button>
     </div>
-    <h2 class="titulo-lista">As minhas conversas</h2>
+    <h2 class="titulo-lista">Quem entra na caverna</h2>
     <div id="lista"></div>
-    <button id="b-nova" class="principal larga">Nova conversa</button>
-    <p class="nota">Esta lista fica s&oacute; neste aparelho e neste browser. Se o limpares, perdes o acesso &agrave;s salas.</p>
+    <button id="b-nova" class="principal larga">Abrir uma passagem</button>
+    <p class="nota">Esta lista existe s&oacute; neste aparelho. Ningu&eacute;m mais a v&ecirc; &mdash; nem o servidor.</p>
   </div>
 </main>
 
@@ -36,10 +37,10 @@
       <div class="marca"><span class="marca-icone"></span>Sala</div>
       <button id="b-voltar" class="ligacao-peq oculto">voltar</button>
     </div>
-    <h1>Nova conversa.</h1>
+    <h1>Abrir<br />uma passagem.</h1>
     <p class="lead">
-      Cada conversa &eacute; uma sala fechada, s&oacute; para voc&ecirc;s os dois. As mensagens s&atilde;o
-      cifradas dentro do teu aparelho e desaparecem no fim do tempo.
+      L&aacute; fora h&aacute; ru&iacute;do, algoritmos e gente a mais. Aqui entra uma pessoa de cada vez, por
+      convite teu. Fecha-se quando o tempo acaba e n&atilde;o deixa rasto.
     </p>
 
     <div id="campo-eu">
@@ -47,10 +48,10 @@
       <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" />
     </div>
 
-    <label class="rotulo" for="para-criar">Com quem vais falar</label>
+    <label class="rotulo" for="para-criar">Quem deixas entrar</label>
     <input id="para-criar" maxlength="20" placeholder="Ana" autocomplete="off" enterkeyhint="go" />
 
-    <span class="rotulo">A sala apaga-se em</span>
+    <span class="rotulo">A passagem fecha-se em</span>
     <div class="opcoes" role="radiogroup" aria-label="Duracao">
       <button type="button" class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
       <button type="button" class="opcao activa" data-ttl="24h" role="radio" aria-checked="true">24 horas</button>
@@ -66,10 +67,11 @@
 <main id="v-convite" class="ecra oculto">
   <div class="col">
     <div class="marca"><span class="marca-icone"></span>Sala <span id="cod-convite" class="cod-peq"></span></div>
-    <h1>Pronto.<br />Manda o link <span id="para-convite"></span>.</h1>
+    <h1>Passagem<br />aberta.</h1>
+    <p class="destinatario">para <span id="para-convite"></span></p>
     <p class="lead">
-      A chave vai depois do <b>#</b> e nunca sai do teu aparelho. Quem n&atilde;o tiver o link
-      inteiro n&atilde;o l&ecirc; nada &mdash; nem o servidor.
+      A chave vai depois do <b>#</b> e nunca sai do teu aparelho. Sem o link inteiro, ningu&eacute;m
+      l&ecirc; nada &mdash; nem quem gere o servidor.
     </p>
 
     <div class="caixa-link"><code id="link-sala"></code></div>
@@ -77,8 +79,8 @@
     <button id="b-partilhar" class="principal larga oculto">Partilhar o link</button>
     <button id="b-copiar" class="principal larga">Copiar o link</button>
     <button id="b-entrar-minha" class="secundaria larga">Entrar na conversa</button>
-    <button id="b-lista" class="secundaria larga">Voltar &agrave;s minhas conversas</button>
-    <p class="nota">Guarda-o agora. N&atilde;o h&aacute; forma de o recuperar.</p>
+    <button id="b-lista" class="secundaria larga">Voltar &agrave; caverna</button>
+    <p class="nota">Guarda-o agora. N&atilde;o h&aacute; segunda via.</p>
   </div>
 </main>
 
@@ -91,8 +93,8 @@
 
     <div id="form-entrada" class="oculto">
       <input id="nome-entrada" maxlength="20" placeholder="Escreve o teu nome" autocomplete="off" enterkeyhint="go" class="grande" />
-      <button id="b-entrar" class="principal larga">Entrar na conversa</button>
-      <p class="nota centro">Sem conta, sem n&uacute;mero de telefone.</p>
+      <button id="b-entrar" class="principal larga">Entrar</button>
+      <p class="nota centro">Sem conta. Sem n&uacute;mero. Sem rasto.</p>
     </div>
 
     <p id="e-entrada" class="erro centro" role="alert"></p>
@@ -109,15 +111,15 @@
     </div>
     <button id="b-menu" class="icone" aria-label="Op&ccedil;&otilde;es">&#8942;</button>
     <div id="menu" class="menu oculto">
-      <button id="b-convidar">Convidar algu&eacute;m</button>
-      <button id="b-sair">Sair da sala</button>
-      <button id="b-fechar" class="perigo">Fechar e apagar tudo</button>
+      <button id="b-convidar">Reenviar o link</button>
+      <button id="b-sair">Voltar &agrave; caverna</button>
+      <button id="b-fechar" class="perigo">Selar a passagem</button>
     </div>
   </header>
 
   <section id="fluxo">
     <div class="col-larga">
-      <div id="cifra-nota" class="cifra-nota">As mensagens desta sala s&atilde;o cifradas ponta a ponta.</div>
+      <div id="cifra-nota" class="cifra-nota">S&oacute; voc&ecirc;s os dois. Cifrado ponta a ponta.</div>
       <div id="mensagens"></div>
       <div id="fim"></div>
     </div>
