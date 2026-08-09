@@ -1,14 +1,14 @@
 /* Modo caverna — escuro e luz. Sem mais nada. */
 
 :root {
-  --rocha: #000000;
-  --rocha-alta: #0b0b0b;
-  --parede: #141414;
-  --fenda: #262626;
+  --rocha: #0f0f0f;
+  --rocha-alta: #191919;
+  --parede: #232323;
+  --fenda: #3a3a3a;
   --luz: #ffffff;
-  --osso: #ededed;
-  --po: #8a8a8a;
-  --sombra: #565656;
+  --osso: #f2f2f2;
+  --po: #b6b6b6;
+  --sombra: #949494;
   --titulo: "Anton", "Arial Narrow", sans-serif;
   --sans: "Inter", system-ui, -apple-system, sans-serif;
   --mono: "Space Mono", ui-monospace, monospace;
@@ -30,7 +30,7 @@ html, body {
   position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background:
     radial-gradient(ellipse 65% 40% at 50% 106%, rgba(255,255,255,0.09), transparent 72%),
-    radial-gradient(ellipse 115% 75% at 50% 45%, transparent 32%, rgba(0,0,0,0.75) 100%);
+    radial-gradient(ellipse 120% 80% at 50% 45%, transparent 45%, rgba(0,0,0,0.42) 100%);
 }
 body > *:not(.brasa) { position: relative; z-index: 1; }
 
@@ -103,7 +103,7 @@ input, textarea {
   outline: none; transition: border-color 0.2s;
   -webkit-appearance: none;
 }
-input::placeholder, textarea::placeholder { color: #4a4a4a; }
+input::placeholder, textarea::placeholder { color: #7a7a7a; }
 input:focus, textarea:focus { border-color: var(--luz); }
 input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom: 12px; }
 #nome-criar, #para-criar { margin-bottom: 26px; }
@@ -126,7 +126,7 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
   border-radius: 8px; transition: opacity 0.15s, transform 0.1s;
 }
 .principal:active { transform: scale(0.985); }
-.principal:disabled { opacity: 0.32; }
+.principal:disabled { opacity: 0.4; }
 
 .secundaria {
   padding: 16px 26px; font-size: 14px; font-weight: 500;
@@ -193,9 +193,9 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
   border-radius: 10px; padding: 12px 13px; margin-bottom: 9px;
   transition: transform 0.1s, border-color 0.2s, background 0.2s;
 }
-.item:hover { border-color: #3a3a3a; background: var(--parede); }
+.item:hover { border-color: #555; background: var(--parede); }
 .item:active { transform: scale(0.99); }
-.item.morta { opacity: 0.35; }
+.item.morta { opacity: 0.5; }
 
 .item-avatar {
   width: 42px; height: 42px; border-radius: 50%;
@@ -286,9 +286,9 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
 }
 .hora {
   display: block; text-align: right; font-family: var(--mono);
-  font-size: 10px; color: #4f4f4f; margin-top: 3px;
+  font-size: 10px; color: #9a9a9a; margin-top: 3px;
 }
-.msg.minha .hora { color: #8f8f8f; }
+.msg.minha .hora { color: #6a6a6a; }
 .msg.ilegivel .corpo { font-style: italic; color: var(--sombra); font-size: 13.5px; }
 
 .sistema {
