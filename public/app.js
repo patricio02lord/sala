@@ -355,6 +355,7 @@ async function acrescentar(msg) {
       desenharCabecalho();
     }
     sistema(`${autor} entrou.`);
+    if (autor !== nome) som.entrou();
     return;
   }
 
@@ -387,6 +388,7 @@ async function acrescentar(msg) {
   div.dataset.t = msg.t;
 
   $("mensagens").append(div);
+  if (!ilegivel && jaEntrou && !minha) som.recebida();
   ultimoAutor = autor;
   ultimoElemento = div;
   aoFundo(true);
@@ -470,6 +472,7 @@ async function enviar() {
   if (!socket?.connected) return erro("e-sala", "Sem ligação. Espera um instante.");
   $("texto").value = "";
   $("texto").style.height = "auto";
+  som.enviada();
   try {
     socket.emit("mensagem", { ct: await cifrar({ n: nome, txt }) }, (r) => erro("e-sala", r?.ok ? "" : r?.erro));
   } catch {
@@ -500,6 +503,75 @@ escutar("b-fechar", "click", () => {
     setTimeout(() => (location.href = "/"), 400);
   }
 });
+
+/* ---------- Som ---------- */
+/* Tons gerados no proprio browser: sem ficheiros, sem descargas, sem bibliotecas. */
+
+let audio = null, tocando = null;
+const podeVibrar = (ms) => { try { navigator.vibrate?.(ms); } catch {} };
+
+function contexto() {
+  if (!audio) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audio = new AC();
+  }
+  if (audio.state === "suspended") audio.resume().catch(() => {});
+  return audio;
+}
+
+function tom(freq, dur = 0.13, vol = 0.05, atraso = 0) {
+  const ac = contexto();
+  if (!ac) return;
+  const t = ac.currentTime + atraso;
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  osc.type = "sine";
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g).connect(ac.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+const som = {
+  toque: () => tom(660, 0.06, 0.025),
+  enviada: () => tom(880, 0.09, 0.035),
+  recebida: () => { tom(700, 0.1, 0.04); tom(940, 0.1, 0.035, 0.09); },
+  entrou: () => { tom(620, 0.12, 0.04); tom(830, 0.14, 0.04, 0.12); },
+  atendida: () => { tom(560, 0.1, 0.05); tom(750, 0.12, 0.05, 0.1); tom(940, 0.16, 0.05, 0.21); },
+  desligada: () => { tom(480, 0.14, 0.05); tom(330, 0.2, 0.045, 0.13); },
+};
+
+function tocarChamada(tipo) {
+  pararToque();
+  if (tipo === "entrada") {
+    const padrao = () => {
+      tom(700, 0.22, 0.075);
+      tom(940, 0.26, 0.07, 0.24);
+      podeVibrar([250, 180, 250]);
+    };
+    padrao();
+    tocando = setInterval(padrao, 2400);
+  } else {
+    const padrao = () => { tom(430, 0.32, 0.035); };
+    padrao();
+    tocando = setInterval(padrao, 2600);
+  }
+}
+
+function pararToque() {
+  clearInterval(tocando);
+  tocando = null;
+  podeVibrar(0);
+}
+
+/* toque discreto em qualquer botao */
+document.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("button")) { som.toque(); podeVibrar(8); }
+}, { passive: true });
 
 /* ---------- Chamada (WebRTC ponto a ponto) ---------- */
 /* O audio vai directamente de um browser para o outro. A sinalizacao passa pelo
@@ -551,6 +623,8 @@ async function criarLigacao() {
   pc.onconnectionstatechange = () => {
     if (pc?.connectionState === "connected" && estadoChamada !== "em-curso") {
       estadoChamada = "em-curso";
+      pararToque();
+      som.atendida();
       ecraChamada("em-curso", "");
       contarTempo();
     }
@@ -568,6 +642,7 @@ async function ligarPara() {
   try {
     estadoChamada = "a-chamar";
     ecraChamada("a-chamar", "A chamar…");
+    tocarChamada("saida");
     await criarLigacao();
     const oferta = await pc.createOffer();
     await pc.setLocalDescription(oferta);
@@ -578,6 +653,7 @@ async function ligarPara() {
 }
 
 function limparChamada() {
+  pararToque();
   clearInterval(relogio);
   streamLocal?.getTracks().forEach((t) => t.stop());
   streamLocal = null;
@@ -593,6 +669,7 @@ function limparChamada() {
 }
 
 function terminar(motivo) {
+  if (estadoChamada !== "parado") som.desligada();
   const houve = estadoChamada === "em-curso";
   const dur = houve ? Math.floor((Date.now() - inicioChamada) / 1000) : 0;
   limparChamada();
@@ -625,6 +702,7 @@ async function receberSinal({ ct }) {
     pc = null;
     ofertaGuardada = sinal.sdp;
     ecraChamada("a-tocar", "Está a ligar…");
+    tocarChamada("entrada");
     return;
   }
 
@@ -652,6 +730,7 @@ escutar("b-atender", "click", async () => {
   estadoChamada = "em-curso";
   const oferta = ofertaGuardada;
   ofertaGuardada = null;
+  pararToque();
   try {
     ecraChamada("em-curso", "A ligar…");
     await criarLigacao();
