@@ -44,8 +44,8 @@ function salaViva(code) {
 
 function destruirSala(code, motivo) {
   if (!salas.delete(code)) return;
-  io.to(code).emit("sala:fechada", { motivo });
-  io.in(code).disconnectSockets(true);
+  io.to(code).emit("sala:fechada", { code, motivo });
+  io.in(code).socketsLeave(code);
 }
 
 function limitar(mapa, chave, regra) {
@@ -113,64 +113,80 @@ const http = createServer(app);
 const io = new Server(http, { maxHttpBufferSize: 1e5, pingTimeout: 20000 });
 
 io.on("connection", (socket) => {
-  let salaAtual = null;
+  const minhas = new Set();   // uma ligacao pode servir varias conversas ao mesmo tempo
   const envios = new Map();
   const sinais = new Map();
 
+  const contar = (c) => io.sockets.adapter.rooms.get(c)?.size ?? 0;
+
   socket.on("entrar", async ({ code } = {}, ack) => {
-    if (salaAtual) return;
     const c = String(code || "").toUpperCase();
     const s = salaViva(c);
-    if (!s) return ack?.({ ok: false, erro: "Essa sala não existe ou já expirou." });
+    if (!s) return ack?.({ ok: false, code: c, erro: "Esta conversa não existe ou já terminou." });
 
-    const dentro = io.sockets.adapter.rooms.get(c)?.size ?? 0;
-    if (dentro >= (s.limite || MAX_PESSOAS)) {
-      return ack?.({ ok: false, erro: "Esta sala já está ocupada." });
+    if (minhas.has(c)) {
+      return ack?.({ ok: true, code: c, expiraEm: s.expiraEm, historico: s.msgs });
+    }
+    if (minhas.size >= 30) return ack?.({ ok: false, code: c, erro: "Conversas a mais nesta ligação." });
+    if (contar(c) >= (s.limite || MAX_PESSOAS)) {
+      return ack?.({ ok: false, code: c, erro: "Esta conversa já está ocupada." });
     }
 
-    salaAtual = c;
+    minhas.add(c);
     await socket.join(c);
-    ack?.({ ok: true, expiraEm: s.expiraEm, historico: s.msgs });
-    io.to(c).emit("presenca", { n: io.sockets.adapter.rooms.get(c)?.size ?? 1 });
+    ack?.({ ok: true, code: c, expiraEm: s.expiraEm, historico: s.msgs });
+    io.to(c).emit("presenca", { code: c, n: contar(c) });
   });
 
-  socket.on("mensagem", ({ ct } = {}, ack) => {
-    if (!salaAtual) return ack?.({ ok: false, erro: "Não estás numa sala." });
+  socket.on("mensagem", ({ code, ct } = {}, ack) => {
+    const c = String(code || "").toUpperCase();
+    if (!minhas.has(c)) return ack?.({ ok: false, erro: "Não estás nesta conversa." });
     if (typeof ct !== "string" || !ct || ct.length > MAX_PAYLOAD) {
       return ack?.({ ok: false, erro: "Mensagem inválida." });
     }
     if (!limitar(envios, "self", ENVIAR_POR_LIGACAO)) {
       return ack?.({ ok: false, erro: "Estás a escrever depressa demais." });
     }
-    const s = salaViva(salaAtual);
-    if (!s) return ack?.({ ok: false, erro: "A sala expirou." });
+    const s = salaViva(c);
+    if (!s) return ack?.({ ok: false, erro: "A conversa terminou." });
 
-    // O servidor nunca vê o conteúdo: `ct` é texto cifrado no browser.
+    // O servidor nunca ve o conteudo: `ct` e texto cifrado no browser.
     const msg = { id: `${Date.now().toString(36)}${randomInt(1e6).toString(36)}`, ct, t: Date.now() };
     s.msgs.push(msg);
     if (s.msgs.length > MAX_HISTORICO) s.msgs.shift();
-    io.to(salaAtual).emit("mensagem", msg);
+    io.to(c).emit("mensagem", { code: c, ...msg });
     ack?.({ ok: true });
   });
 
   // Sinalizacao das chamadas. O conteudo vai cifrado: o servidor apenas reencaminha.
-  socket.on("sinal", ({ ct } = {}) => {
-    if (!salaAtual) return;
+  socket.on("sinal", ({ code, ct } = {}) => {
+    const c = String(code || "").toUpperCase();
+    if (!minhas.has(c)) return;
     if (typeof ct !== "string" || !ct || ct.length > 20000) return;
     if (!limitar(sinais, "self", SINAIS_POR_LIGACAO)) return;
-    if (!salaViva(salaAtual)) return;
-    socket.to(salaAtual).emit("sinal", { ct });
+    if (!salaViva(c)) return;
+    socket.to(c).emit("sinal", { code: c, ct });
   });
 
-  socket.on("fechar", () => {
-    if (salaAtual) destruirSala(salaAtual, "Alguém fechou a sala.");
+  socket.on("sair", ({ code } = {}) => {
+    const c = String(code || "").toUpperCase();
+    if (!minhas.delete(c)) return;
+    socket.leave(c);
+    io.to(c).emit("presenca", { code: c, n: contar(c) });
+    socket.to(c).emit("saiu", { code: c });
+  });
+
+  socket.on("fechar", ({ code } = {}) => {
+    const c = String(code || "").toUpperCase();
+    if (minhas.has(c)) destruirSala(c, "Esta conversa foi apagada.");
   });
 
   socket.on("disconnect", () => {
-    if (!salaAtual) return;
-    socket.to(salaAtual).emit("saiu");
-    const n = io.sockets.adapter.rooms.get(salaAtual)?.size ?? 0;
-    io.to(salaAtual).emit("presenca", { n });
+    for (const c of minhas) {
+      socket.to(c).emit("saiu", { code: c });
+      io.to(c).emit("presenca", { code: c, n: Math.max(0, contar(c) - 1) });
+    }
+    minhas.clear();
   });
 });
 
