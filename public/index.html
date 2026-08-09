@@ -3,9 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#DEDCD5" />
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Sala</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23333F35'/><rect x='11' y='11' width='10' height='10' fill='%23DEDCD5'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
@@ -13,94 +15,106 @@
 </head>
 <body>
 
-<!-- PORTA -->
-<main id="porta" class="porta">
+<!-- 1. CRIAR -->
+<main id="v-criar" class="ecra oculto">
   <div class="col">
-    <p class="eyebrow">Sem conta · sem perfil · sem histórico</p>
+    <p class="eyebrow">Sem conta &middot; sem perfil &middot; sem hist&oacute;rico</p>
     <h1>Uma sala,<br />e mais nada.</h1>
     <p class="lead">
-      Abre uma sala e passa o link a quem quiseres. Ninguém te encontra por procura, por número
-      ou por sugestão. As mensagens são cifradas no teu browser — o servidor guarda texto que não
-      consegue ler. Quando o tempo acaba, a sala desaparece.
+      Abre uma sala e passa o link a quem quiseres. As mensagens s&atilde;o fechadas &agrave; chave dentro do teu
+      aparelho. Quando o tempo acaba, desaparece tudo.
     </p>
 
-    <label class="rotulo" for="nome">O teu nome aqui dentro</label>
-    <input id="nome" maxlength="20" placeholder="qualquer coisa" autocomplete="off" />
+    <label class="rotulo" for="nome-criar">O teu nome aqui dentro</label>
+    <input id="nome-criar" maxlength="20" placeholder="qualquer coisa" autocomplete="off" enterkeyhint="go" />
 
-    <div id="bloco-ttl">
+    <div class="campo">
       <span class="rotulo">A sala apaga-se em</span>
-      <div class="opcoes" role="radiogroup" aria-label="Duração da sala">
-        <button class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
-        <button class="opcao activa" data-ttl="24h" role="radio" aria-checked="true">24 horas</button>
-        <button class="opcao" data-ttl="7d" role="radio" aria-checked="false">7 dias</button>
+      <div class="opcoes" role="radiogroup" aria-label="Duracao da sala">
+        <button type="button" class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
+        <button type="button" class="opcao activa" data-ttl="24h" role="radio" aria-checked="true">24 horas</button>
+        <button type="button" class="opcao" data-ttl="7d" role="radio" aria-checked="false">7 dias</button>
       </div>
     </div>
 
-    <button id="abrir" class="principal">Abrir uma sala</button>
-
-    <div id="bloco-entrar">
-      <div class="ou"><span class="risca"></span><span class="eyebrow">ou</span><span class="risca"></span></div>
-      <div class="linha">
-        <input id="codigo" maxlength="6" placeholder="CÓDIGO" class="mono" autocomplete="off" spellcheck="false" />
-        <button id="entrar" class="secundaria">Entrar</button>
-      </div>
-    </div>
-
-    <p id="erro-porta" class="erro" role="alert"></p>
+    <button id="b-criar" class="principal larga">Abrir uma sala</button>
+    <p id="e-criar" class="erro" role="alert"></p>
   </div>
 </main>
 
-<!-- CONVITE (depois de criar) -->
-<main id="convite" class="porta oculto">
+<!-- 2. CONVITE -->
+<main id="v-convite" class="ecra oculto">
   <div class="col">
-    <p class="eyebrow">Sala aberta</p>
-    <h1>Passa este link.<br />Só a uma pessoa,<br />se quiseres.</h1>
+    <p class="eyebrow">Sala <span id="cod-convite" class="mono"></span> aberta</p>
+    <h1>Passa este link.</h1>
     <p class="lead">
-      A chave de decifração está depois do <b>#</b> — essa parte do endereço nunca é enviada ao
-      servidor. Quem não tiver o link completo não lê nada.
+      A chave est&aacute; depois do <b>#</b> e nunca sai do teu aparelho. Quem n&atilde;o tiver o link inteiro
+      n&atilde;o l&ecirc; nada &mdash; nem o servidor.
     </p>
+
     <div class="caixa-link"><code id="link-sala"></code></div>
-    <div class="linha">
-      <button id="copiar" class="principal">Copiar link</button>
-      <button id="ir" class="secundaria">Entrar na sala</button>
+
+    <div class="botoes">
+      <button id="b-partilhar" class="principal oculto">Partilhar</button>
+      <button id="b-copiar" class="principal">Copiar link</button>
+      <button id="b-entrar-minha" class="secundaria">Entrar</button>
     </div>
-    <p class="nota">Guarda-o agora. Não há forma de o recuperar depois.</p>
+    <p class="nota">Guarda-o agora. N&atilde;o h&aacute; forma de o recuperar.</p>
   </div>
 </main>
 
-<!-- SALA -->
-<div id="sala" class="sala oculto">
+<!-- 3. ENTRADA POR CONVITE -->
+<main id="v-entrada" class="ecra oculto">
+  <div class="col">
+    <p class="eyebrow">Foste convidado</p>
+    <h1>Sala <span id="cod-entrada" class="mono destaque-cod"></span></h1>
+    <p id="info-entrada" class="lead">A confirmar a sala&hellip;</p>
+
+    <div id="form-entrada" class="oculto">
+      <label class="rotulo" for="nome-entrada">Como queres ser tratado aqui</label>
+      <input id="nome-entrada" maxlength="20" placeholder="o teu nome" autocomplete="off" enterkeyhint="go" />
+      <button id="b-entrar" class="principal larga">Entrar na sala</button>
+    </div>
+
+    <p id="e-entrada" class="erro" role="alert"></p>
+  </div>
+</main>
+
+<!-- 4. SALA -->
+<div id="v-sala" class="sala oculto">
   <header>
-    <div>
+    <div class="cabecalho-info">
       <div class="linha-topo">
-        <span id="codigo-sala" class="mono forte"></span>
-        <button id="copiar-topo" class="ligacao">copiar link</button>
+        <span id="cod-sala" class="mono forte"></span>
+        <span id="estado" class="pastilha"></span>
       </div>
-      <p id="expira" class="mono fraco"></p>
+      <p id="conta" class="mono fraco"></p>
     </div>
     <div class="acoes">
-      <span id="presenca" class="mono fraco"></span>
-      <button id="sair" class="ligacao">sair</button>
-      <button id="fechar" class="ligacao destaque">fechar sala</button>
+      <button id="b-convidar" class="ligacao">convidar</button>
+      <button id="b-sair" class="ligacao">sair</button>
+      <button id="b-fechar" class="ligacao destaque">fechar</button>
     </div>
   </header>
 
   <section id="fluxo">
     <div class="col-larga">
-      <p id="vazio" class="mono fraco">Ninguém falou ainda.</p>
+      <p id="vazio" class="mono fraco vazio">Ningu&eacute;m falou ainda. Convida algu&eacute;m.</p>
       <div id="mensagens"></div>
       <div id="fim"></div>
     </div>
   </section>
 
   <footer>
-    <div class="col-larga linha">
-      <input id="texto" placeholder="escreve" autocomplete="off" />
-      <button id="enviar" class="principal mono">enviar</button>
+    <div class="col-larga barra">
+      <textarea id="texto" rows="1" placeholder="escreve" enterkeyhint="send"></textarea>
+      <button id="b-enviar" class="principal" aria-label="Enviar">&rarr;</button>
     </div>
-    <p id="erro-sala" class="erro" role="alert"></p>
+    <p id="e-sala" class="erro" role="alert"></p>
   </footer>
 </div>
+
+<div id="aviso" class="aviso oculto" role="status"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/app.js" type="module"></script>
