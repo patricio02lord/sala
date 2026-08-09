@@ -15,18 +15,40 @@
 </head>
 <body>
 
+<!-- 0. AS MINHAS SALAS -->
+<main id="v-lista" class="ecra topo oculto">
+  <div class="col">
+    <div class="lista-topo">
+      <div class="marca"><span class="marca-icone"></span>Sala</div>
+      <button id="b-eu" class="ligacao-peq">eu: <span id="meu-nome"></span></button>
+    </div>
+    <h2 class="titulo-lista">As minhas conversas</h2>
+    <div id="lista"></div>
+    <button id="b-nova" class="principal larga">Nova conversa</button>
+    <p class="nota">Esta lista fica s&oacute; neste aparelho e neste browser. Se o limpares, perdes o acesso &agrave;s salas.</p>
+  </div>
+</main>
+
 <!-- 1. CRIAR -->
 <main id="v-criar" class="ecra oculto">
   <div class="col">
-    <div class="marca"><span class="marca-icone"></span>Sala</div>
-    <h1>Uma sala,<br />e mais nada.</h1>
+    <div class="lista-topo">
+      <div class="marca"><span class="marca-icone"></span>Sala</div>
+      <button id="b-voltar" class="ligacao-peq oculto">voltar</button>
+    </div>
+    <h1>Nova conversa.</h1>
     <p class="lead">
-      Abre uma sala e passa o link a quem quiseres. As mensagens s&atilde;o fechadas &agrave; chave dentro
-      do teu aparelho. Quando o tempo acaba, desaparece tudo.
+      Cada conversa &eacute; uma sala fechada, s&oacute; para voc&ecirc;s os dois. As mensagens s&atilde;o
+      cifradas dentro do teu aparelho e desaparecem no fim do tempo.
     </p>
 
-    <label class="rotulo" for="nome-criar">O teu nome</label>
-    <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" enterkeyhint="go" />
+    <div id="campo-eu">
+      <label class="rotulo" for="nome-criar">O teu nome</label>
+      <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" />
+    </div>
+
+    <label class="rotulo" for="para-criar">Com quem vais falar</label>
+    <input id="para-criar" maxlength="20" placeholder="Ana" autocomplete="off" enterkeyhint="go" />
 
     <span class="rotulo">A sala apaga-se em</span>
     <div class="opcoes" role="radiogroup" aria-label="Duracao">
@@ -35,7 +57,7 @@
       <button type="button" class="opcao" data-ttl="7d" role="radio" aria-checked="false">7 dias</button>
     </div>
 
-    <button id="b-criar" class="principal larga">Abrir a minha sala</button>
+    <button id="b-criar" class="principal larga">Criar a conversa</button>
     <p id="e-criar" class="erro" role="alert"></p>
   </div>
 </main>
@@ -44,7 +66,7 @@
 <main id="v-convite" class="ecra oculto">
   <div class="col">
     <div class="marca"><span class="marca-icone"></span>Sala <span id="cod-convite" class="cod-peq"></span></div>
-    <h1>Est&aacute; aberta.<br />Passa o link.</h1>
+    <h1>Pronto.<br />Manda o link <span id="para-convite"></span>.</h1>
     <p class="lead">
       A chave vai depois do <b>#</b> e nunca sai do teu aparelho. Quem n&atilde;o tiver o link
       inteiro n&atilde;o l&ecirc; nada &mdash; nem o servidor.
@@ -54,7 +76,8 @@
 
     <button id="b-partilhar" class="principal larga oculto">Partilhar o link</button>
     <button id="b-copiar" class="principal larga">Copiar o link</button>
-    <button id="b-entrar-minha" class="secundaria larga">Entrar na sala</button>
+    <button id="b-entrar-minha" class="secundaria larga">Entrar na conversa</button>
+    <button id="b-lista" class="secundaria larga">Voltar &agrave;s minhas conversas</button>
     <p class="nota">Guarda-o agora. N&atilde;o h&aacute; forma de o recuperar.</p>
   </div>
 </main>
