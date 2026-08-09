@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#F6F7F4" />
+<meta name="theme-color" content="#0B1120" />
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Sala</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23F6F7F4'/><circle cx='16' cy='16' r='6' fill='%235A765F'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%234F46E5'/><rect x='11' y='10' width='10' height='12' rx='3' fill='%23fff'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -25,12 +25,12 @@
       <button id="b-eu" class="ligacao-peq">eu: <span id="meu-nome"></span></button>
     </div>
     <div class="painel-corpo">
-      <h2 class="titulo-lista">As tuas conversas</h2>
+      <h2 class="titulo-lista">Conversas</h2>
       <div id="lista"></div>
     </div>
     <div class="painel-fundo">
-      <button id="b-nova" class="principal larga">Come&ccedil;ar uma conversa</button>
-      <p class="nota">Esta lista existe s&oacute; neste aparelho. Ningu&eacute;m mais a v&ecirc; &mdash; nem o servidor.</p>
+      <button id="b-nova" class="principal larga">Nova conversa</button>
+      <p class="nota">Guardado apenas neste aparelho.</p>
     </div>
   </aside>
 
@@ -38,7 +38,7 @@
 
     <div id="v-nada" class="palco-nada">
       <span class="marca-icone grande"></span>
-      <p>Escolhe uma conversa &agrave; esquerda,<br />ou come&ccedil;a uma nova.</p>
+      <p>Seleciona uma conversa para come&ccedil;ar.</p>
     </div>
 
     <div id="v-sala" class="sala oculto">
@@ -54,11 +54,13 @@
         <button id="b-chamar" class="icone" aria-label="Ligar">
           <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z" fill="currentColor"/></svg>
         </button>
-        <button id="b-menu" class="icone" aria-label="Op&ccedil;&otilde;es">&#8942;</button>
+        <button id="b-menu" class="icone" aria-label="Op&ccedil;&otilde;es">
+          <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><circle cx="10" cy="4.5" r="1.4" fill="currentColor"/><circle cx="10" cy="10" r="1.4" fill="currentColor"/><circle cx="10" cy="15.5" r="1.4" fill="currentColor"/></svg>
+        </button>
         <div id="menu" class="menu oculto">
-          <button id="b-convidar">Reenviar o link</button>
+          <button id="b-convidar">Copiar link</button>
           <button id="b-sair">Voltar &agrave;s conversas</button>
-          <button id="b-fechar" class="perigo">Apagar esta conversa</button>
+          <button id="b-fechar" class="perigo">Apagar conversa</button>
         </div>
       </header>
 
@@ -78,7 +80,7 @@
 
       <section id="fluxo">
         <div class="col-larga">
-          <div id="cifra-nota" class="cifra-nota">S&oacute; voc&ecirc;s os dois. Cifrado ponta a ponta.</div>
+          <div id="cifra-nota" class="cifra-nota">Cifrado ponta a ponta</div>
           <div id="mensagens"></div>
           <div id="fim"></div>
         </div>
@@ -86,7 +88,7 @@
 
       <footer>
         <div class="barra">
-          <textarea id="texto" rows="1" placeholder="Mensagem" enterkeyhint="send"></textarea>
+          <textarea id="texto" rows="1" placeholder="Escrever mensagem" enterkeyhint="send"></textarea>
           <button id="b-enviar" class="enviar" aria-label="Enviar">
             <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 20.5 21 12 3 3.5l3.2 7.1L14 12l-7.8 1.4z" fill="currentColor"/></svg>
           </button>
@@ -102,9 +104,9 @@
 <main id="v-fechado" class="ecra centrado oculto">
   <div class="col estreita">
     <span class="marca-icone grande"></span>
-    <h1 class="titulo-entrada">Este espa&ccedil;o &eacute; privado.</h1>
+    <h1 class="titulo-entrada">Espa&ccedil;o privado</h1>
     <p class="lead centro">
-      N&atilde;o h&aacute; nada aqui para ver. As conversas existem apenas para quem recebeu um link.
+      O acesso &eacute; feito por convite. Sem um link v&aacute;lido, n&atilde;o h&aacute; nada a mostrar aqui.
     </p>
     <button id="b-sou-dono" class="ligacao-peq">sou o dono</button>
 
@@ -123,10 +125,10 @@
       <div class="marca"><span class="marca-icone"></span>Sala</div>
       <button id="b-voltar" class="ligacao-peq oculto">voltar</button>
     </div>
-    <h1>Um lugar<br />calmo.</h1>
+    <h1>Nova conversa</h1>
     <p class="lead">
-      Sem seguidores, sem n&uacute;meros, sem nada a pedir a tua aten&ccedil;&atilde;o. Uma conversa de cada vez,
-      com quem tu escolheres. E quando o tempo passa, desfaz-se sozinha.
+      Gera um link privado para uma pessoa. As mensagens s&atilde;o cifradas no teu aparelho
+      e a conversa expira sozinha.
     </p>
 
     <div id="campo-eu">
@@ -134,14 +136,14 @@
       <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" />
     </div>
 
-    <span class="rotulo">A conversa desfaz-se em</span>
+    <span class="rotulo">Expira em</span>
     <div class="opcoes" role="radiogroup" aria-label="Duracao">
       <button type="button" class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
       <button type="button" class="opcao activa" data-ttl="24h" role="radio" aria-checked="true">24 horas</button>
       <button type="button" class="opcao" data-ttl="7d" role="radio" aria-checked="false">7 dias</button>
     </div>
 
-    <button id="b-criar" class="principal larga">Criar a conversa</button>
+    <button id="b-criar" class="principal larga">Gerar link</button>
     <p id="e-criar" class="erro" role="alert"></p>
   </div>
 </main>
@@ -150,20 +152,20 @@
 <main id="v-convite" class="ecra oculto">
   <div class="col">
     <div class="marca"><span class="marca-icone"></span>Sala <span id="cod-convite" class="cod-peq"></span></div>
-    <h1>Est&aacute; pronta.</h1>
-    <p class="destinatario" id="para-convite">Manda o link a uma pessoa. S&oacute; uma entra.</p>
+    <h1>Link gerado</h1>
+    <p class="destinatario" id="para-convite">V&aacute;lido para uma pessoa.</p>
     <p class="lead">
-      A chave vai depois do <b>#</b> e nunca sai do teu aparelho. Sem o link inteiro ningu&eacute;m
-      l&ecirc; nada &mdash; nem quem gere o servidor.
+      A chave de decifra&ccedil;&atilde;o est&aacute; depois do <b>#</b> e nunca chega ao servidor.
+      Sem o link completo, o conte&uacute;do &eacute; ileg&iacute;vel.
     </p>
 
     <div class="caixa-link"><code id="link-sala"></code></div>
 
-    <button id="b-partilhar" class="principal larga oculto">Partilhar o link</button>
-    <button id="b-copiar" class="principal larga">Copiar o link</button>
-    <button id="b-entrar-minha" class="secundaria larga">Entrar na conversa</button>
-    <button id="b-lista" class="secundaria larga">Voltar &agrave;s conversas</button>
-    <p class="nota">Guarda-o agora. N&atilde;o h&aacute; segunda via.</p>
+    <button id="b-partilhar" class="principal larga oculto">Partilhar</button>
+    <button id="b-copiar" class="principal larga">Copiar link</button>
+    <button id="b-entrar-minha" class="secundaria larga">Abrir conversa</button>
+    <button id="b-lista" class="secundaria larga">Voltar</button>
+    <p class="nota">Guarda-o agora &mdash; n&atilde;o pode ser recuperado.</p>
   </div>
 </main>
 
@@ -177,7 +179,7 @@
     <div id="form-entrada" class="oculto">
       <input id="nome-entrada" maxlength="20" placeholder="Escreve o teu nome" autocomplete="off" enterkeyhint="go" class="grande" />
       <button id="b-entrar" class="principal larga">Entrar</button>
-      <p class="nota centro">Sem conta. Sem n&uacute;mero. Sem rasto.</p>
+      <p class="nota centro">Sem conta e sem n&uacute;mero de telefone.</p>
     </div>
 
     <p id="e-entrada" class="erro centro" role="alert"></p>
