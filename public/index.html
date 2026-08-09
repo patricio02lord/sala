@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Sala</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23F6F7F4'/><circle cx='16' cy='16' r='6' fill='%236F8B76'/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%23F6F7F4'/><circle cx='16' cy='16' r='6' fill='%235A765F'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -16,21 +16,75 @@
 <body>
 <div class="luz" aria-hidden="true"></div>
 
-<!-- 0. AS MINHAS SALAS -->
-<main id="v-lista" class="ecra topo oculto">
-  <div class="col">
-    <div class="lista-topo">
+<!-- APLICAÇÃO: lista + conversa lado a lado -->
+<div id="v-app" class="app oculto">
+
+  <aside id="painel" class="painel">
+    <div class="painel-topo">
       <div class="marca"><span class="marca-icone"></span>Sala</div>
       <button id="b-eu" class="ligacao-peq">eu: <span id="meu-nome"></span></button>
     </div>
-    <h2 class="titulo-lista">As tuas conversas</h2>
-    <div id="lista"></div>
-    <button id="b-nova" class="principal larga">Come&ccedil;ar uma conversa</button>
-    <p class="nota">Esta lista existe s&oacute; neste aparelho. Ningu&eacute;m mais a v&ecirc; &mdash; nem o servidor.</p>
-  </div>
-</main>
+    <div class="painel-corpo">
+      <h2 class="titulo-lista">As tuas conversas</h2>
+      <div id="lista"></div>
+    </div>
+    <div class="painel-fundo">
+      <button id="b-nova" class="principal larga">Come&ccedil;ar uma conversa</button>
+      <p class="nota">Esta lista existe s&oacute; neste aparelho. Ningu&eacute;m mais a v&ecirc; &mdash; nem o servidor.</p>
+    </div>
+  </aside>
 
-<!-- 1. CRIAR -->
+  <section id="palco" class="palco">
+
+    <div id="v-nada" class="palco-nada">
+      <span class="marca-icone grande"></span>
+      <p>Escolhe uma conversa &agrave; esquerda,<br />ou come&ccedil;a uma nova.</p>
+    </div>
+
+    <div id="v-sala" class="sala oculto">
+      <header>
+        <button id="b-voltar-lista" class="icone so-telemovel" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15.4 4.6 8 12l7.4 7.4 1.4-1.4L10.8 12l6-6z" fill="currentColor"/></svg>
+        </button>
+        <div class="avatar peq" id="avatar-sala">&middot;</div>
+        <div class="cabecalho-info">
+          <p id="titulo-sala" class="titulo-sala">Conversa</p>
+          <p id="conta" class="sub"></p>
+        </div>
+        <button id="b-chamar" class="icone" aria-label="Ligar">
+          <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z" fill="currentColor"/></svg>
+        </button>
+        <button id="b-menu" class="icone" aria-label="Op&ccedil;&otilde;es">&#8942;</button>
+        <div id="menu" class="menu oculto">
+          <button id="b-convidar">Reenviar o link</button>
+          <button id="b-sair">Voltar &agrave;s conversas</button>
+          <button id="b-fechar" class="perigo">Apagar esta conversa</button>
+        </div>
+      </header>
+
+      <section id="fluxo">
+        <div class="col-larga">
+          <div id="cifra-nota" class="cifra-nota">S&oacute; voc&ecirc;s os dois. Cifrado ponta a ponta.</div>
+          <div id="mensagens"></div>
+          <div id="fim"></div>
+        </div>
+      </section>
+
+      <footer>
+        <div class="barra">
+          <textarea id="texto" rows="1" placeholder="Mensagem" enterkeyhint="send"></textarea>
+          <button id="b-enviar" class="enviar" aria-label="Enviar">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 20.5 21 12 3 3.5l3.2 7.1L14 12l-7.8 1.4z" fill="currentColor"/></svg>
+          </button>
+        </div>
+        <p id="e-sala" class="erro" role="alert"></p>
+      </footer>
+    </div>
+
+  </section>
+</div>
+
+<!-- CRIAR -->
 <main id="v-criar" class="ecra oculto">
   <div class="col">
     <div class="lista-topo">
@@ -48,7 +102,6 @@
       <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" />
     </div>
 
-
     <span class="rotulo">A conversa desfaz-se em</span>
     <div class="opcoes" role="radiogroup" aria-label="Duracao">
       <button type="button" class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
@@ -61,7 +114,7 @@
   </div>
 </main>
 
-<!-- 2. CONVITE -->
+<!-- CONVITE -->
 <main id="v-convite" class="ecra oculto">
   <div class="col">
     <div class="marca"><span class="marca-icone"></span>Sala <span id="cod-convite" class="cod-peq"></span></div>
@@ -82,12 +135,12 @@
   </div>
 </main>
 
-<!-- 3. BOAS-VINDAS (quem recebe o link) -->
+<!-- BOAS-VINDAS -->
 <main id="v-entrada" class="ecra centrado oculto">
   <div class="col estreita">
     <div class="avatar" id="avatar-anfitriao">?</div>
     <h1 id="titulo-entrada" class="titulo-entrada">Bem-vindo</h1>
-    <p id="info-entrada" class="lead centro">A confirmar a sala&hellip;</p>
+    <p id="info-entrada" class="lead centro">A confirmar a conversa&hellip;</p>
 
     <div id="form-entrada" class="oculto">
       <input id="nome-entrada" maxlength="20" placeholder="Escreve o teu nome" autocomplete="off" enterkeyhint="go" class="grande" />
@@ -98,44 +151,6 @@
     <p id="e-entrada" class="erro centro" role="alert"></p>
   </div>
 </main>
-
-<!-- 4. SALA -->
-<div id="v-sala" class="sala oculto">
-  <header>
-    <div class="avatar peq" id="avatar-sala">?</div>
-    <div class="cabecalho-info">
-      <p id="titulo-sala" class="titulo-sala">Sala</p>
-      <p id="conta" class="sub"></p>
-    </div>
-    <button id="b-chamar" class="icone" aria-label="Ligar">
-      <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z" fill="currentColor"/></svg>
-    </button>
-    <button id="b-menu" class="icone" aria-label="Op&ccedil;&otilde;es">&#8942;</button>
-    <div id="menu" class="menu oculto">
-      <button id="b-convidar">Reenviar o link</button>
-      <button id="b-sair">Voltar &agrave;s conversas</button>
-      <button id="b-fechar" class="perigo">Apagar esta conversa</button>
-    </div>
-  </header>
-
-  <section id="fluxo">
-    <div class="col-larga">
-      <div id="cifra-nota" class="cifra-nota">S&oacute; voc&ecirc;s os dois. Cifrado ponta a ponta.</div>
-      <div id="mensagens"></div>
-      <div id="fim"></div>
-    </div>
-  </section>
-
-  <footer>
-    <div class="barra">
-      <textarea id="texto" rows="1" placeholder="Mensagem" enterkeyhint="send"></textarea>
-      <button id="b-enviar" class="enviar" aria-label="Enviar">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3 20.5 21 12 3 3.5l3.2 7.1L14 12l-7.8 1.4z" fill="currentColor"/></svg>
-      </button>
-    </div>
-    <p id="e-sala" class="erro" role="alert"></p>
-  </footer>
-</div>
 
 <!-- CHAMADA -->
 <div id="chamada" class="chamada oculto" role="dialog" aria-label="Chamada">
