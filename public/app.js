@@ -447,6 +447,8 @@ async function abrirConversa(code) {
   actualizarSub();
   desenharConversa();
   desenharLista();
+  if (chamada.estado !== "parado" && chamada.code === code) ecraChamada(chamada.estado, $("chamada-estado").textContent);
+  else if (chamada.code !== code) $("chamada").classList.add("oculto");
   history.replaceState(null, "", `/s/${code}#k=${s.k}`);
 }
 
@@ -625,14 +627,14 @@ const chamada = { estado: "parado", code: "", pc: null, stream: null, pendentes:
 function ecraChamada(estado, texto) {
   const s = vivas.get(chamada.code);
   const outro = s?.para || "alguém";
+  const emCurso = estado === "em-curso";
   $("chamada").classList.toggle("oculto", estado === "parado");
   $("chamada").classList.toggle("a-tocar", estado === "a-tocar" || estado === "a-chamar");
-  $("chamada-avatar").textContent = inicial(outro);
-  $("chamada-avatar").style.background = corDe(outro || chamada.code);
-  $("chamada-nome").textContent = outro;
+  $("chamada-nome").textContent = emCurso ? `Em chamada com ${outro}` : outro;
   $("chamada-estado").textContent = texto || "";
   $("b-atender").classList.toggle("oculto", estado !== "a-tocar");
-  $("b-silencio").classList.toggle("oculto", estado !== "em-curso");
+  $("b-silencio").classList.toggle("oculto", !emCurso);
+  $("b-desligar").textContent = estado === "a-tocar" ? "Recusar" : "Desligar";
 }
 
 function contarTempo() {
