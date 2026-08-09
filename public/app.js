@@ -5,7 +5,7 @@
 
 const $ = (id) => document.getElementById(id) || document.createElement("span");
 const escutar = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
-const ECRAS = ["v-app", "v-criar", "v-convite", "v-entrada"];
+const ECRAS = ["v-app", "v-criar", "v-convite", "v-entrada", "v-fechado"];
 const CORES = ["#5a765f", "#7a6b59", "#5c6b80", "#785f76", "#6b7752", "#82665a"];
 
 /** conversas activas nesta ligacao: code -> {chave, k, para, expira, msgs, novas, dono, ligada} */
@@ -110,8 +110,12 @@ function etiquetar(code, quem) {
 function esquecerSala(code) {
   gravarArquivo(lerArquivo().filter((x) => x.code !== code));
 }
-const souDono = () => lerArquivo().some((x) => x.dono === true);
-const ehConvidado = () => lerArquivo().length > 0 && !souDono();
+const lerChaveDono = () => { try { return localStorage.getItem("sala:dono") || ""; } catch { return ""; } };
+const guardarChaveDono = (v) => { try { localStorage.setItem("sala:dono", v); } catch {} };
+let espacoFechado = false;
+
+const souDono = () => Boolean(lerChaveDono()) || lerArquivo().some((x) => x.dono === true);
+const ehConvidado = () => !lerChaveDono();
 const primeiraViva = () => lerArquivo().find((x) => Date.now() < x.expira);
 
 /* ---------- Som ---------- */
@@ -510,7 +514,7 @@ async function criarSala() {
     const k = await exportarChave(chave);
     const r = await fetch("/api/salas", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-dono": lerChaveDono() },
       body: JSON.stringify({ ttl, limite: 2, anfitriao: await cifrar({ nome: n }, chave) }),
     });
     const d = await r.json();
@@ -787,9 +791,50 @@ escutar("b-atender", "click", async () => {
   }
 });
 
+/* ---------- Espaço fechado ---------- */
+
+function mostrarFechado(msg) {
+  mostrar("v-fechado");
+  $("form-dono").classList.toggle("oculto", !lerChaveDono() && !msg);
+  erro("e-fechado", msg || "");
+}
+
+escutar("b-sou-dono", "click", () => {
+  $("form-dono").classList.remove("oculto");
+  $("chave-dono").focus();
+});
+
+async function entrarComoDono() {
+  const chave = $("chave-dono").value;
+  if (!chave) return erro("e-fechado", "Escreve a palavra-passe.");
+  $("b-entrar-dono").disabled = true;
+  try {
+    const r = await fetch("/api/dono", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chave }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.erro);
+    guardarChaveDono(chave);
+    $("chave-dono").value = "";
+    erro("e-fechado", "");
+    if (lerArquivo().length) { desenharLista(); mostrar("v-app"); abrirPalco(false); }
+    else irParaCriar();
+  } catch (e) {
+    erro("e-fechado", e.message || "Não foi possível confirmar.");
+  } finally {
+    $("b-entrar-dono").disabled = false;
+  }
+}
+
+escutar("b-entrar-dono", "click", entrarComoDono);
+escutar("chave-dono", "keydown", (e) => e.key === "Enter" && entrarComoDono());
+
 /* ---------- Navegação ---------- */
 
 function irParaCriar() {
+  if (espacoFechado && !lerChaveDono()) { mostrarFechado(""); return; }
   if (ehConvidado()) {
     const minha = primeiraViva();
     if (minha) { abrirConversa(minha.code); return; }
@@ -841,10 +886,7 @@ function nadaVisivel() {
 function mostrarAlgo() {
   if (!nadaVisivel()) return;
   if (ehConvidado()) {
-    mostrar("v-entrada");
-    $("form-entrada").classList.add("oculto");
-    $("titulo-entrada").textContent = "Conversa terminada";
-    $("info-entrada").textContent = "Pede um novo link a quem te convidou.";
+    mostrarFechado("");
   } else {
     desenharLista();
     mostrar("v-app");
@@ -874,6 +916,11 @@ async function restaurar() {
 }
 
 async function arrancar() {
+  try {
+    const est = await (await fetch("/estado")).json();
+    espacoFechado = Boolean(est.fechado);
+  } catch { espacoFechado = false; }
+
   const noLink = location.pathname.startsWith("/s/");
   const codeLink = noLink ? (location.pathname.split("/s/")[1] || "").toUpperCase().slice(0, 6) : "";
   const jaTenho = lerArquivo().some((x) => x.code === codeLink);
@@ -885,11 +932,16 @@ async function arrancar() {
   if (noLink && jaTenho && nome) { desenharLista(); abrirConversa(codeLink); return; }
   if (noLink) { await prepararEntrada(); return; }
 
-  if (ehConvidado()) { desenharLista(); irParaCriar(); return; }
+  if (ehConvidado()) {
+    const minha = primeiraViva();
+    if (minha && nome) { desenharLista(); await abrirConversa(minha.code); return; }
+    mostrarFechado("");
+    return;
+  }
   if (lerArquivo().length && nome) { desenharLista(); mostrar("v-app"); abrirPalco(false); return; }
   irParaCriar();
 }
 
 arrancar()
-  .catch((e) => { console.error(e); mostrarAlgo(); if (nadaVisivel()) irParaCriar(); })
+  .catch((e) => { console.error(e); mostrarAlgo(); })
   .finally(() => setTimeout(mostrarAlgo, 400));
