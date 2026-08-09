@@ -96,6 +96,11 @@ function guardarSala(entrada) {
   v.unshift(entrada);
   gravarArquivo(v);
 }
+function etiquetar(code, quem) {
+  const v = lerArquivo();
+  const i = v.findIndex((x) => x.code === code);
+  if (i >= 0 && !v[i].para) { v[i].para = quem; gravarArquivo(v); }
+}
 function esquecerSala(code) {
   gravarArquivo(lerArquivo().filter((x) => x.code !== code));
 }
@@ -131,10 +136,12 @@ function desenharLista() {
     txt.style.padding = "0";
     const n = document.createElement("p");
     n.className = "item-nome";
-    n.textContent = sala.para || `Sala ${sala.code}`;
+    n.textContent = sala.para || "À espera de alguém";
     const sub = document.createElement("p");
     sub.className = "item-sub";
-    sub.textContent = morta ? "terminada" : `termina daqui a ${restante(sala.expira)}`;
+    sub.textContent = morta
+      ? "terminada"
+      : (sala.para ? "" : `${sala.code} · `) + `termina daqui a ${restante(sala.expira)}`;
     txt.append(n, sub);
     txt.addEventListener("click", () => (morta ? null : abrirGuardada(sala)));
 
@@ -194,9 +201,7 @@ document.querySelectorAll(".opcao").forEach((b) =>
 
 async function criarSala() {
   const n = ($("nome-criar").value.trim() || lerNome()).trim();
-  const destino = $("para-criar").value.trim();
   if (!n) return erro("e-criar", "Escreve o teu nome primeiro.");
-  if (!destino) return erro("e-criar", "Escreve o nome de quem vai receber o link.");
   $("b-criar").disabled = true;
   $("b-criar").textContent = "A abrir…";
   try {
@@ -212,9 +217,8 @@ async function criarSala() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
 
-    codigo = d.code; expiraEm = d.expiraEm; para = destino;
-    guardarSala({ code: codigo, k: chaveTexto, para: destino, expira: expiraEm });
-    $("para-convite").textContent = `a ${destino}`;
+    codigo = d.code; expiraEm = d.expiraEm; para = "";
+    guardarSala({ code: codigo, k: chaveTexto, para: "", expira: expiraEm });
     $("cod-convite").textContent = codigo;
     $("link-sala").textContent = linkDaSala();
     history.replaceState(null, "", `/s/${codigo}#k=${chaveTexto}`);
@@ -229,13 +233,13 @@ async function criarSala() {
 }
 
 $("b-criar").addEventListener("click", criarSala);
-$("para-criar").addEventListener("keydown", (e) => e.key === "Enter" && criarSala());
+$("nome-criar").addEventListener("keydown", (e) => e.key === "Enter" && criarSala());
 
 /* ---------- 2. Convite ---------- */
 
 async function partilhar() {
   try {
-    await navigator.share({ title: "Sala", text: `Conversa privada${para ? " para " + para : ""}. Este link expira.`, url: linkDaSala() });
+    await navigator.share({ title: "Sala", text: "Conversa privada. Este link expira.", url: linkDaSala() });
   } catch {}
 }
 
@@ -305,6 +309,8 @@ function entrarPorConvite() {
   const n = $("nome-entrada").value.trim();
   if (!n) return erro("e-entrada", "Escreve o teu nome para continuar.");
   nome = n; guardarNome(n); erro("e-entrada", "");
+  para = anfitriao;
+  guardarSala({ code: codigo, k: chaveTexto, para: anfitriao, expira: expiraEm });
   $("b-entrar").disabled = true;
   $("b-entrar").textContent = "A ligar…";
   ligar();
@@ -331,14 +337,24 @@ function sistema(txt) {
 async function acrescentar(msg) {
   const div = document.createElement("div");
   div.className = "msg";
-  let autor = "—", corpo = "", ilegivel = false;
+  let autor = "—", corpo = "", ilegivel = false, claroTipo = "";
   try {
     const claro = await decifrar(msg.ct);
     autor = String(claro.n || "?").slice(0, 20);
     corpo = String(claro.txt || "");
+    claroTipo = claro.tipo || "";
   } catch {
     ilegivel = true;
     corpo = "mensagem cifrada com outra chave";
+  }
+
+  if (!ilegivel && claroTipo === "entrada") {
+    if (autor !== nome) {
+      if (!para) { para = autor; etiquetar(codigo, autor); }
+      desenharCabecalho();
+    }
+    sistema(`${autor} entrou.`);
+    return;
   }
 
   const minha = !ilegivel && autor === nome;
@@ -375,6 +391,13 @@ async function acrescentar(msg) {
   aoFundo(true);
 }
 
+function desenharCabecalho() {
+  const outro = para || anfitriao;
+  $("titulo-sala").textContent = outro ? `Conversa com ${outro}` : "À espera de alguém";
+  $("avatar-sala").textContent = outro ? inicial(outro) : "·";
+  $("avatar-sala").style.background = corDe(outro || codigo);
+}
+
 function actualizarSub(n) {
   const pessoas = n === undefined ? "" : n === 1 ? "só tu · " : `${n} pessoas · `;
   $("conta").textContent = `${pessoas}desaparece daqui a ${restante(expiraEm)}`;
@@ -383,11 +406,7 @@ function actualizarSub(n) {
 function ligar() {
   if (!chave || !codigo) return;
   mostrar("v-sala");
-  const outro = para || anfitriao;
-  const titulo = outro ? `Conversa com ${outro}` : `Sala ${codigo}`;
-  $("titulo-sala").textContent = titulo;
-  $("avatar-sala").textContent = inicial(outro || codigo);
-  $("avatar-sala").style.background = corDe(outro || codigo);
+  desenharCabecalho();
   actualizarSub();
   ajustarAltura();
 
@@ -410,8 +429,14 @@ function ligar() {
       $("mensagens").textContent = "";
       ultimoAutor = null; ultimoElemento = null;
       for (const m of r.historico) await acrescentar(m);
-      if (jaEntrou) sistema("Ligação recuperada.");
-      jaEntrou = true;
+      if (jaEntrou) {
+        sistema("Ligação recuperada.");
+      } else {
+        jaEntrou = true;
+        try {
+          socket.emit("mensagem", { ct: await cifrar({ n: nome, tipo: "entrada" }) });
+        } catch {}
+      }
       actualizarSub();
       aoFundo(false);
     });
@@ -485,11 +510,10 @@ function irParaCriar() {
   const meu = lerNome();
   $("campo-eu").classList.toggle("oculto", !!meu);
   $("nome-criar").value = meu;
-  $("para-criar").value = "";
   $("b-voltar").classList.toggle("oculto", !lerArquivo().length);
   erro("e-criar", "");
   mostrar("v-criar");
-  (meu ? $("para-criar") : $("nome-criar")).focus();
+  $("nome-criar").focus();
 }
 
 $("b-nova").addEventListener("click", irParaCriar);
