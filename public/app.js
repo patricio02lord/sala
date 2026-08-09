@@ -444,6 +444,8 @@ function ligar() {
   });
 
   socket.on("mensagem", acrescentar);
+  socket.on("sinal", receberSinal);
+  socket.on("saiu", () => { if (estadoChamada !== "parado") terminar("A pessoa saiu."); });
   socket.on("presenca", ({ n }) => actualizarSub(n));
   socket.on("sala:fechada", ({ motivo }) => {
     sistema(motivo);
@@ -490,12 +492,178 @@ const menu = $("menu");
 escutar("b-menu", "click", (e) => { e.stopPropagation(); menu.classList.toggle("oculto"); });
 document.addEventListener("click", () => menu.classList.add("oculto"));
 escutar("b-convidar", "click", () => (navigator.share ? partilhar() : copiar()));
-escutar("b-sair", "click", () => { socket?.disconnect(); location.href = "/"; });
+escutar("b-sair", "click", () => { limparChamada(); socket?.disconnect(); location.href = "/"; });
 
 escutar("b-fechar", "click", () => {
   if (confirm("Isto apaga a sala para toda a gente. Continuar?")) {
     socket?.emit("fechar");
     setTimeout(() => (location.href = "/"), 400);
+  }
+});
+
+/* ---------- Chamada (WebRTC ponto a ponto) ---------- */
+/* O audio vai directamente de um browser para o outro. A sinalizacao passa pelo
+   servidor mas vai cifrada com a chave da sala, por isso ele nao a consegue ler.
+   Para redes mais fechadas seria preciso um servidor TURN; ver nota no fim. */
+
+const ICE = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  // { urls: "turn:...", username: "...", credential: "..." },
+];
+
+let pc = null, streamLocal = null, estadoChamada = "parado";
+let pendentes = [], relogio = null, inicioChamada = 0, silenciado = false, ofertaGuardada = null;
+
+function ecraChamada(estado, texto) {
+  const outro = para || anfitriao || "alguém";
+  $("chamada").classList.toggle("oculto", estado === "parado");
+  $("chamada").classList.toggle("a-tocar", estado === "a-tocar" || estado === "a-chamar");
+  $("chamada-avatar").textContent = inicial(outro);
+  $("chamada-avatar").style.background = corDe(outro || codigo);
+  $("chamada-nome").textContent = outro;
+  $("chamada-estado").textContent = texto || "";
+  $("b-atender").classList.toggle("oculto", estado !== "a-tocar");
+  $("b-silencio").classList.toggle("oculto", estado !== "em-curso");
+}
+
+function contarTempo() {
+  clearInterval(relogio);
+  inicioChamada = Date.now();
+  const passo = () => {
+    const s = Math.floor((Date.now() - inicioChamada) / 1000);
+    $("chamada-estado").textContent =
+      `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  };
+  passo();
+  relogio = setInterval(passo, 1000);
+}
+
+async function enviarSinal(objeto) {
+  if (!socket?.connected) return;
+  try { socket.emit("sinal", { ct: await cifrar(objeto) }); } catch {}
+}
+
+async function criarLigacao() {
+  pc = new RTCPeerConnection({ iceServers: ICE });
+  pc.onicecandidate = (e) => { if (e.candidate) enviarSinal({ tipo: "ice", cand: e.candidate }); };
+  pc.ontrack = (e) => { $("audio-remoto").srcObject = e.streams[0]; };
+  pc.onconnectionstatechange = () => {
+    if (pc?.connectionState === "connected" && estadoChamada !== "em-curso") {
+      estadoChamada = "em-curso";
+      ecraChamada("em-curso", "");
+      contarTempo();
+    }
+    if (["failed", "disconnected"].includes(pc?.connectionState) && estadoChamada === "em-curso") {
+      terminar("A ligação caiu.");
+    }
+  };
+  streamLocal = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  streamLocal.getTracks().forEach((t) => pc.addTrack(t, streamLocal));
+}
+
+async function ligarPara() {
+  if (estadoChamada !== "parado") return;
+  if (!socket?.connected) return avisar("Sem ligação");
+  try {
+    estadoChamada = "a-chamar";
+    ecraChamada("a-chamar", "A chamar…");
+    await criarLigacao();
+    const oferta = await pc.createOffer();
+    await pc.setLocalDescription(oferta);
+    await enviarSinal({ tipo: "oferta", sdp: pc.localDescription });
+  } catch (e) {
+    terminar(e.name === "NotAllowedError" ? "Precisas de dar acesso ao microfone." : "Não foi possível ligar.");
+  }
+}
+
+function limparChamada() {
+  clearInterval(relogio);
+  streamLocal?.getTracks().forEach((t) => t.stop());
+  streamLocal = null;
+  try { pc?.close(); } catch {}
+  pc = null;
+  pendentes = [];
+  silenciado = false;
+  $("b-silencio").textContent = "Silenciar";
+  $("b-silencio").classList.remove("silenciado");
+  $("audio-remoto").srcObject = null;
+  estadoChamada = "parado";
+  ecraChamada("parado");
+}
+
+function terminar(motivo) {
+  const houve = estadoChamada === "em-curso";
+  const dur = houve ? Math.floor((Date.now() - inicioChamada) / 1000) : 0;
+  limparChamada();
+  if (motivo) avisar(motivo);
+  if (houve) sistema(`Chamada terminada · ${Math.floor(dur / 60)}m ${dur % 60}s`);
+}
+
+function desligar() {
+  if (estadoChamada === "parado") return;
+  enviarSinal({ tipo: "fim" });
+  terminar(null);
+}
+
+function alternarSilencio() {
+  if (!streamLocal) return;
+  silenciado = !silenciado;
+  streamLocal.getAudioTracks().forEach((t) => (t.enabled = !silenciado));
+  $("b-silencio").textContent = silenciado ? "Ligar o microfone" : "Silenciar";
+  $("b-silencio").classList.toggle("silenciado", silenciado);
+}
+
+async function receberSinal({ ct }) {
+  let sinal;
+  try { sinal = await decifrar(ct); } catch { return; }
+
+  if (sinal.tipo === "oferta") {
+    if (estadoChamada !== "parado") { await enviarSinal({ tipo: "ocupado" }); return; }
+    estadoChamada = "a-tocar";
+    pendentes = [];
+    pc = null;
+    ofertaGuardada = sinal.sdp;
+    ecraChamada("a-tocar", "Está a ligar…");
+    return;
+  }
+
+  if (sinal.tipo === "resposta" && pc) {
+    try { await pc.setRemoteDescription(sinal.sdp); } catch {}
+    return;
+  }
+
+  if (sinal.tipo === "ice") {
+    if (pc?.remoteDescription) { try { await pc.addIceCandidate(sinal.cand); } catch {} }
+    else pendentes.push(sinal.cand);
+    return;
+  }
+
+  if (sinal.tipo === "fim") { terminar(null); return; }
+  if (sinal.tipo === "ocupado") { terminar("A pessoa está ocupada."); return; }
+}
+
+
+escutar("b-chamar", "click", ligarPara);
+escutar("b-desligar", "click", desligar);
+escutar("b-silencio", "click", alternarSilencio);
+escutar("b-atender", "click", async () => {
+  if (!ofertaGuardada) return;
+  estadoChamada = "em-curso";
+  const oferta = ofertaGuardada;
+  ofertaGuardada = null;
+  try {
+    ecraChamada("em-curso", "A ligar…");
+    await criarLigacao();
+    await pc.setRemoteDescription(oferta);
+    for (const c of pendentes) { try { await pc.addIceCandidate(c); } catch {} }
+    pendentes = [];
+    const resposta = await pc.createAnswer();
+    await pc.setLocalDescription(resposta);
+    await enviarSinal({ tipo: "resposta", sdp: pc.localDescription });
+  } catch (e) {
+    await enviarSinal({ tipo: "fim" });
+    terminar(e.name === "NotAllowedError" ? "Precisas de dar acesso ao microfone." : "Não foi possível atender.");
   }
 });
 
