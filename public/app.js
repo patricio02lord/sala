@@ -1,839 +1,449 @@
-/* Sala — cliente.
-   Uma unica ligacao serve todas as conversas ao mesmo tempo.
-   A chave AES-GCM de cada conversa vive no fragmento do link (#k=...),
-   que os browsers nunca enviam ao servidor. */
+/* Um lugar calmo — luz, espaço e nada a pedir atenção. */
 
-const $ = (id) => document.getElementById(id) || document.createElement("span");
-const escutar = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
-const ECRAS = ["v-app", "v-criar", "v-convite", "v-entrada"];
-const CORES = ["#5a765f", "#7a6b59", "#5c6b80", "#785f76", "#6b7752", "#82665a"];
-
-/** conversas activas nesta ligacao: code -> {chave, k, para, expira, msgs, novas, dono, ligada} */
-const vivas = new Map();
-
-let socket = null;
-let activa = "";        // conversa aberta no ecra
-let nome = "";
-let ttl = "24h";
-let convite = null;     // dados do link recebido, antes de entrar
-
-/* ---------- Utilidades ---------- */
-
-const mostrar = (id) => ECRAS.forEach((e) => $(e).classList.toggle("oculto", e !== id));
-const erro = (id, txt) => ($(id).textContent = txt || "");
-const inicial = (n) => (n || "?").trim().charAt(0).toUpperCase() || "?";
-const horas = (t) => new Date(t).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
-
-function corDe(txt) {
-  let h = 0;
-  for (let i = 0; i < (txt || "").length; i++) h = (h * 31 + txt.charCodeAt(i)) >>> 0;
-  return CORES[h % CORES.length];
+:root {
+  --fundo: #f6f7f4;
+  --superficie: #ffffff;
+  --veu: #eef0ec;
+  --linha: #e2e6de;
+  --tinta: #2c332e;
+  --suave: #616961;
+  --leve: #7d857e;
+  --salva: #5a765f;
+  --salva-fundo: #e9f0ea;
+  --salva-escura: #3f5943;
+  --serif: "Fraunces", Georgia, serif;
+  --sans: "Inter", system-ui, -apple-system, sans-serif;
+  --alt: 100dvh;
 }
 
-function restante(ate) {
-  const s = Math.max(0, ate - Date.now()) / 1000;
-  if (s < 60) return "menos de um minuto";
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h >= 24) return `${Math.floor(h / 24)} dia${h >= 48 ? "s" : ""}`;
-  if (h >= 1) return `${h}h ${m}m`;
-  return `${m} minutos`;
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; height: 100%;
+  background: var(--fundo); color: var(--tinta);
+  font-family: var(--sans); font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
-let avisoTimer;
-function avisar(txt) {
-  const el = $("aviso");
-  el.textContent = txt;
-  el.classList.remove("oculto");
-  clearTimeout(avisoTimer);
-  avisoTimer = setTimeout(() => el.classList.add("oculto"), 2400);
+/* Luz da manhã, muito ao de leve */
+.luz {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -12%, rgba(255,255,255,0.95), transparent 65%),
+    radial-gradient(ellipse 70% 45% at 78% 105%, rgba(90,118,95,0.07), transparent 70%);
+}
+.ecra, .app { position: relative; z-index: 1; }
+
+.oculto { display: none !important; }
+.centro { text-align: center; }
+
+button {
+  cursor: pointer; font-family: var(--sans); border: none; color: inherit;
+  transition: transform 0.09s ease, filter 0.2s ease, background 0.25s, border-color 0.25s;
+}
+button:active { transform: scale(0.965); }
+.icone:active { transform: scale(0.88); }
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--salva); outline-offset: 3px;
 }
 
-const guardarNome = (n) => { try { localStorage.setItem("sala:nome", n); } catch {} };
-const lerNome = () => { try { return localStorage.getItem("sala:nome") || ""; } catch { return ""; } };
-const linkDe = (code) => `${location.origin}/s/${code}#k=${vivas.get(code)?.k || ""}`;
+/* ---------- Ecrãs ---------- */
 
-function ajustarAltura() {
-  const h = window.visualViewport?.height || window.innerHeight;
-  document.documentElement.style.setProperty("--alt", h + "px");
+.ecra {
+  min-height: var(--alt);
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 24px calc(40px + env(safe-area-inset-bottom));
+  animation: respirar 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
-window.visualViewport?.addEventListener("resize", ajustarAltura);
-window.addEventListener("resize", ajustarAltura);
-ajustarAltura();
+.ecra.topo { align-items: flex-start; padding-top: calc(40px + env(safe-area-inset-top)); }
+.ecra.centrado { text-align: center; }
+.col { width: 100%; max-width: 430px; }
+.col.estreita { max-width: 370px; }
 
-/* ---------- Cifra ---------- */
+@keyframes respirar { from { opacity: 0; transform: translateY(16px); } }
 
-const b64u = {
-  para: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
-  de: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)),
-};
-
-const gerarChave = () => crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-const exportarChave = async (k) => b64u.para(await crypto.subtle.exportKey("raw", k));
-const importarChave = (s) => crypto.subtle.importKey("raw", b64u.de(s), { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
-
-async function cifrar(objeto, chave) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, chave,
-    new TextEncoder().encode(JSON.stringify(objeto)));
-  const junto = new Uint8Array(iv.length + ct.byteLength);
-  junto.set(iv); junto.set(new Uint8Array(ct), iv.length);
-  return b64u.para(junto);
+.marca {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; font-weight: 500; letter-spacing: 0.01em;
+  color: var(--suave); margin-bottom: 40px;
 }
-
-async function decifrar(texto, chave) {
-  const b = b64u.de(texto);
-  const claro = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b.slice(0, 12) }, chave, b.slice(12));
-  return JSON.parse(new TextDecoder().decode(claro));
+.marca-icone {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--salva); flex-shrink: 0;
+  animation: pulsar 5s ease-in-out infinite;
 }
+@keyframes pulsar { 50% { opacity: 0.5; transform: scale(0.9); } }
 
-/* ---------- Arquivo local ---------- */
+.cod-peq { font-size: 13px; color: var(--leve); letter-spacing: 0.08em; }
 
-const CHAVE_ARQ = "sala:minhas";
-
-function lerArquivo() {
-  try { return JSON.parse(localStorage.getItem(CHAVE_ARQ) || "[]"); } catch { return []; }
+h1 {
+  font-family: var(--serif);
+  font-size: clamp(38px, 10vw, 52px);
+  font-weight: 300; line-height: 1.04;
+  letter-spacing: -0.015em; color: var(--tinta);
+  margin: 0 0 20px;
 }
-function gravarArquivo(v) {
-  try { localStorage.setItem(CHAVE_ARQ, JSON.stringify(v.slice(0, 60))); } catch {}
-}
-function guardarSala(entrada) {
-  const v = lerArquivo().filter((x) => x.code !== entrada.code);
-  v.unshift(entrada);
-  gravarArquivo(v);
-}
-function etiquetar(code, quem) {
-  const v = lerArquivo();
-  const i = v.findIndex((x) => x.code === code);
-  if (i >= 0 && !v[i].para) { v[i].para = quem; gravarArquivo(v); }
-}
-function esquecerSala(code) {
-  gravarArquivo(lerArquivo().filter((x) => x.code !== code));
-}
-const souDono = () => lerArquivo().some((x) => x.dono);
+.titulo-entrada { font-size: clamp(28px, 7.5vw, 38px); line-height: 1.1; margin-bottom: 14px; }
 
-/* ---------- Som ---------- */
+.destinatario { font-size: 14px; color: var(--suave); margin: -10px 0 24px; line-height: 1.55; }
 
-let audio = null, tocando = null;
-const podeVibrar = (ms) => { try { navigator.vibrate?.(ms); } catch {} };
+.lead { font-size: 15.5px; line-height: 1.75; color: var(--suave); margin: 0 0 34px; }
 
-function contexto() {
-  if (!audio) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    audio = new AC();
-  }
-  if (audio.state === "suspended") audio.resume().catch(() => {});
-  return audio;
+.rotulo {
+  display: block; font-size: 13px; font-weight: 500;
+  color: var(--suave); margin-bottom: 10px;
 }
 
-function tom(freq, dur = 0.13, vol = 0.05, atraso = 0) {
-  const ac = contexto();
-  if (!ac) return;
-  const t = ac.currentTime + atraso;
-  const osc = ac.createOscillator(), g = ac.createGain();
-  osc.type = "sine";
-  osc.frequency.value = freq;
-  g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(vol, t + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g).connect(ac.destination);
-  osc.start(t);
-  osc.stop(t + dur + 0.05);
+input, textarea {
+  width: 100%; padding: 16px 18px;
+  font-family: var(--sans); font-size: 16px;
+  color: var(--tinta); background: var(--superficie);
+  border: 1px solid var(--linha); border-radius: 14px;
+  outline: none; transition: border-color 0.25s, box-shadow 0.25s;
+  -webkit-appearance: none;
+}
+input::placeholder, textarea::placeholder { color: var(--leve); }
+input:focus, textarea:focus {
+  border-color: var(--salva);
+  box-shadow: 0 0 0 4px rgba(90,118,95,0.12);
+}
+input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom: 14px; }
+#nome-criar { margin-bottom: 28px; }
+
+.opcoes { display: flex; gap: 8px; margin-bottom: 32px; }
+.opcao {
+  flex: 1; padding: 14px 4px; font-size: 14px; color: var(--suave);
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 12px; transition: all 0.25s;
+}
+.opcao:active { transform: scale(0.98); }
+.opcao.activa {
+  background: var(--salva-fundo); border-color: var(--salva);
+  color: var(--salva-escura); font-weight: 500;
 }
 
-const som = {
-  toque: () => tom(660, 0.06, 0.025),
-  enviada: () => tom(880, 0.09, 0.035),
-  recebida: () => { tom(700, 0.1, 0.04); tom(940, 0.1, 0.035, 0.09); },
-  entrou: () => { tom(620, 0.12, 0.04); tom(830, 0.14, 0.04, 0.12); },
-  atendida: () => { tom(560, 0.1, 0.05); tom(750, 0.12, 0.05, 0.1); tom(940, 0.16, 0.05, 0.21); },
-  desligada: () => { tom(480, 0.14, 0.05); tom(330, 0.2, 0.045, 0.13); },
-};
+.principal {
+  padding: 17px 26px; font-size: 16px; font-weight: 500;
+  background: var(--salva); color: #fff;
+  border-radius: 14px;
+  transition: background 0.25s, transform 0.12s;
+}
+.principal:hover { background: var(--salva-escura); }
+.principal:active { transform: scale(0.99); }
+.principal:disabled { opacity: 0.45; }
 
-function tocarChamada(tipo) {
-  pararToque();
-  const padrao = tipo === "entrada"
-    ? () => { tom(700, 0.22, 0.075); tom(940, 0.26, 0.07, 0.24); podeVibrar([250, 180, 250]); }
-    : () => tom(430, 0.32, 0.035);
-  padrao();
-  tocando = setInterval(padrao, tipo === "entrada" ? 2400 : 2600);
+.secundaria {
+  padding: 16px 26px; font-size: 15px; font-weight: 500;
+  background: transparent; color: var(--suave);
+  border: 1px solid var(--linha); border-radius: 14px;
+  transition: all 0.25s;
+}
+.secundaria:hover { color: var(--tinta); border-color: var(--leve); }
+.larga { width: 100%; display: block; }
+.larga + .larga { margin-top: 10px; }
+
+.erro { font-size: 13.5px; line-height: 1.55; color: #a35a4e; margin: 14px 0 0; min-height: 17px; }
+.nota { font-size: 13px; color: var(--leve); margin: 18px 0 0; line-height: 1.6; }
+
+.caixa-link {
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 14px; padding: 16px 18px; margin-bottom: 20px; word-break: break-all;
+}
+.caixa-link code { font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.8; color: var(--suave); }
+
+.avatar {
+  width: 74px; height: 74px; border-radius: 50%;
+  background: var(--salva-fundo); color: var(--salva-escura);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--serif); font-size: 30px; font-weight: 300;
+  margin: 0 auto 24px; text-transform: uppercase; user-select: none;
+}
+.avatar.peq {
+  width: 40px; height: 40px; font-size: 17px; margin: 0;
+  flex-shrink: 0; color: #fff;
 }
 
-function pararToque() {
-  clearInterval(tocando);
-  tocando = null;
-  podeVibrar(0);
+/* ---------- Lista ---------- */
+
+.lista-topo {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 34px;
+}
+.lista-topo .marca { margin-bottom: 0; }
+
+.ligacao-peq {
+  background: none; color: var(--leve); font-size: 13px;
+  padding: 6px 0; border-bottom: 1px solid var(--linha); flex-shrink: 0;
+}
+.ligacao-peq:hover { color: var(--salva); }
+
+.titulo-lista {
+  font-family: var(--serif); font-size: 28px; font-weight: 300;
+  letter-spacing: -0.01em; margin: 0 0 20px;
 }
 
-document.addEventListener("pointerdown", (e) => {
-  if (e.target.closest("button")) { som.toque(); podeVibrar(8); }
-}, { passive: true });
+#lista { margin-bottom: 22px; }
 
-/* ---------- Painel de conversas ---------- */
+.item {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 16px; padding: 13px 15px; margin-bottom: 10px;
+  transition: transform 0.12s, box-shadow 0.25s, border-color 0.25s;
+}
+.item:hover { border-color: #d2d8cd; box-shadow: 0 3px 14px rgba(44,51,46,0.05); }
+.item:active { transform: scale(0.995); }
+.item.morta { opacity: 0.5; }
 
-function abrirPalco(aberta) {
-  $("v-app").classList.toggle("com-sala", aberta);
-  $("v-sala").classList.toggle("oculto", !aberta);
-  $("v-nada").classList.toggle("oculto", aberta);
+.item-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-family: var(--serif); font-size: 19px; font-weight: 300;
+  flex-shrink: 0; text-transform: uppercase;
+}
+.item-texto { flex: 1; min-width: 0; color: inherit; }
+.item-nome {
+  font-size: 15.5px; font-weight: 500; margin: 0; color: var(--tinta);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.item-sub { font-size: 12.5px; color: var(--leve); margin: 3px 0 0; }
+.item-acao { background: none; color: var(--leve); font-size: 18px; padding: 8px; flex-shrink: 0; line-height: 1; }
+.item-acao:hover { color: var(--salva); }
+
+.vazio-lista {
+  text-align: center; color: var(--leve); font-size: 14.5px; line-height: 1.7;
+  padding: 44px 20px; margin: 0 0 22px;
+  border: 1px dashed var(--linha); border-radius: 16px;
 }
 
-function modoConvidado() {
-  const dono = souDono();
-  $("v-app").classList.toggle("convidado", !dono);
-  $("b-nova").classList.toggle("oculto", !dono);
+/* ---------- Estrutura: painel + palco ---------- */
+
+.app { display: flex; height: var(--alt); overflow: hidden; }
+
+.painel {
+  width: 340px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  border-right: 1px solid var(--linha);
+}
+.painel-topo {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 20px 14px; padding-top: calc(18px + env(safe-area-inset-top));
+}
+.painel-topo .marca { margin-bottom: 0; }
+.painel-corpo { flex: 1; overflow-y: auto; padding: 6px 16px 10px; }
+.painel-fundo {
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--linha);
+}
+.painel-fundo .nota { margin-top: 12px; font-size: 12px; }
+.painel-corpo .titulo-lista { font-size: 22px; margin: 6px 0 14px; }
+
+.palco { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.palco-nada {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+  text-align: center; color: var(--leve); font-size: 15px; line-height: 1.7;
+  padding: 30px;
+}
+.marca-icone.grande {
+  width: 46px; height: 46px; opacity: 0.28; animation: pulsar 6s ease-in-out infinite;
+}
+.palco-nada p { margin: 0; }
+
+.item.activa {
+  background: var(--salva-fundo);
+  border-color: #c9dbcc;
+}
+.item.activa .item-nome { color: var(--salva-escura); }
+
+.so-telemovel { display: none !important; }
+
+@media (max-width: 860px) {
+  .app { position: relative; }
+  .painel { width: 100%; border-right: none; }
+  .palco { display: none; }
+  .app.com-sala .painel { display: none; }
+  .app.com-sala .palco { display: flex; }
+  .so-telemovel { display: flex !important; align-items: center; }
+  .palco-nada { display: none; }
 }
 
-function desenharLista() {
-  const v = lerArquivo();
-  const alvo = $("lista");
-  alvo.textContent = "";
-  $("meu-nome").textContent = lerNome() || "sem nome";
-  modoConvidado();
+/* contador de mensagens por ler */
+.item-direita { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.bolha {
+  min-width: 21px; height: 21px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--salva); color: #fff;
+  font-size: 11.5px; font-weight: 600; border-radius: 11px;
+}
+.item-texto { background: none; border: none; padding: 0; text-align: left; }
 
-  if (!v.length) {
-    const p = document.createElement("p");
-    p.className = "vazio-lista";
-    p.textContent = "Ainda não tens conversas. Começa uma e manda o link à pessoa.";
-    alvo.append(p);
-    return;
-  }
+/* quem entra por convite nao tem painel nem forma de criar conversas */
+.app.convidado .painel { display: none !important; }
+.app.convidado .palco { display: flex !important; }
+.app.convidado .so-telemovel { display: none !important; }
+.app.convidado .palco-nada { display: none !important; }
+.app.convidado .item-acao { display: none; }
 
-  for (const sala of v) {
-    const morta = Date.now() > sala.expira;
-    const estado = vivas.get(sala.code);
-    const item = document.createElement("div");
-    item.className = "item" + (morta ? " morta" : "") + (sala.code === activa ? " activa" : "");
+/* ---------- Conversa ---------- */
 
-    const av = document.createElement("div");
-    av.className = "item-avatar";
-    av.style.background = corDe(sala.para || sala.code);
-    av.textContent = inicial(sala.para || sala.code);
+.sala { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--fundo); }
 
-    const txt = document.createElement("button");
-    txt.className = "item-texto";
-    const n = document.createElement("p");
-    n.className = "item-nome";
-    n.textContent = sala.para || "À espera de alguém";
-    const sub = document.createElement("p");
-    sub.className = "item-sub";
-    sub.textContent = morta ? "terminada" : `termina daqui a ${restante(sala.expira)}`;
-    txt.append(n, sub);
-    txt.addEventListener("click", () => { if (!morta) abrirConversa(sala.code); });
+.sala header {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; padding-top: calc(11px + env(safe-area-inset-top));
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--linha);
+  flex-shrink: 0;
+}
+.cabecalho-info { flex: 1; min-width: 0; }
+.titulo-sala {
+  font-size: 15.5px; font-weight: 500; margin: 0; color: var(--tinta);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sub { font-size: 12px; color: var(--leve); margin: 3px 0 0; }
 
-    const direita = document.createElement("div");
-    direita.className = "item-direita";
-    if (estado?.novas > 0 && sala.code !== activa) {
-      const b = document.createElement("span");
-      b.className = "bolha";
-      b.textContent = estado.novas > 99 ? "99+" : String(estado.novas);
-      direita.append(b);
-    }
-    const acao = document.createElement("button");
-    acao.className = "item-acao";
-    acao.setAttribute("aria-label", morta ? "Esquecer" : "Copiar link");
-    acao.textContent = morta ? "\u00d7" : "\u29c9";
-    acao.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (morta) { esquecerSala(sala.code); vivas.delete(sala.code); desenharLista(); return; }
-      partilharOuCopiar(sala.code);
-    });
-    direita.append(acao);
+.icone { background: none; color: var(--leve); font-size: 21px; line-height: 1; padding: 8px 6px; flex-shrink: 0; }
+.menu {
+  position: absolute; top: calc(100% - 2px); right: 12px;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 16px; padding: 6px; z-index: 20; min-width: 215px;
+  box-shadow: 0 14px 40px rgba(44,51,46,0.12);
+  animation: respirar 0.2s ease both;
+}
+.menu button {
+  display: block; width: 100%; text-align: left;
+  padding: 12px 14px; font-size: 14.5px; background: none;
+  color: var(--tinta); border-radius: 11px;
+}
+.menu button:hover { background: var(--veu); }
+.menu button.perigo { color: #a35a4e; }
 
-    item.append(av, txt, direita);
-    alvo.append(item);
-  }
+#fluxo { flex: 1; overflow-y: auto; padding: 22px 14px 10px; -webkit-overflow-scrolling: touch; }
+.col-larga { max-width: 680px; margin: 0 auto; }
+
+.cifra-nota {
+  font-size: 12.5px; color: var(--salva-escura); background: var(--salva-fundo);
+  border-radius: 12px; padding: 10px 16px; text-align: center;
+  margin: 0 auto 26px; max-width: 330px; line-height: 1.5;
 }
 
-/* ---------- Ligação única, várias conversas ---------- */
+.msg { display: flex; margin-bottom: 4px; animation: respirar 0.35s ease both; }
+.msg.fim-grupo { margin-bottom: 16px; }
+.msg.minha { justify-content: flex-end; }
 
-function garantirSocket() {
-  if (socket) return socket;
-  socket = io({ transports: ["websocket", "polling"] });
+.balao {
+  max-width: 78%;
+  background: var(--superficie); border: 1px solid var(--linha);
+  border-radius: 18px; padding: 10px 15px 7px;
+}
+.msg.minha .balao { background: var(--salva-fundo); border-color: #d8e4da; }
+.msg.inicio-grupo:not(.minha) .balao { border-top-left-radius: 6px; }
+.msg.inicio-grupo.minha .balao { border-top-right-radius: 6px; }
 
-  socket.on("connect", () => {
-    for (const code of vivas.keys()) entrarNaConversa(code);
-  });
+.autor { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 3px; }
+.corpo {
+  font-size: 15.5px; line-height: 1.55; margin: 0; color: var(--tinta);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.hora { display: block; text-align: right; font-size: 10.5px; color: var(--leve); margin-top: 3px; }
+.msg.minha .hora { color: #7d907f; }
+.msg.ilegivel .corpo { font-style: italic; color: var(--leve); font-size: 13.5px; }
 
-  socket.on("mensagem", ({ code, ...msg }) => receber(code, msg, false));
-
-  socket.on("presenca", ({ code, n }) => {
-    const s = vivas.get(code);
-    if (s) s.pessoas = n;
-    if (code === activa) actualizarSub();
-  });
-
-  socket.on("sala:fechada", ({ code, motivo }) => {
-    if (code === activa) {
-      sistema(motivo || "Esta conversa foi apagada.");
-      $("texto").disabled = true;
-      $("b-enviar").disabled = true;
-    }
-    vivas.delete(code);
-    esquecerSala(code);
-    desenharLista();
-  });
-
-  socket.on("sinal", receberSinal);
-  socket.on("saiu", ({ code }) => {
-    if (chamada.code === code && chamada.estado !== "parado") terminar("A pessoa saiu.");
-  });
-  socket.on("disconnect", () => { if (activa) $("conta").textContent = "sem ligação · a tentar voltar"; });
-
-  return socket;
+.sistema {
+  font-size: 12.5px; color: var(--suave); text-align: center;
+  background: var(--veu); border-radius: 20px;
+  padding: 7px 17px; margin: 20px auto; width: fit-content; max-width: 90%;
 }
 
-function entrarNaConversa(code) {
-  const s = vivas.get(code);
-  if (!s) return;
-  garantirSocket().emit("entrar", { code }, async (r) => {
-    if (!r?.ok) {
-      vivas.delete(code);
-      esquecerSala(code);
-      if (code === activa) { activa = ""; abrirPalco(false); avisar(r?.erro || "Conversa indisponível"); }
-      desenharLista();
-      return;
-    }
-    s.expira = r.expiraEm;
-    const jaTinha = s.iniciada;
-    s.iniciada = true;
-    s.msgs = [];
-    for (const m of r.historico) await receber(code, m, true);
-    if (code === activa) desenharConversa();
-    if (!jaTinha) {
-      try { socket.emit("mensagem", { code, ct: await cifrar({ n: nome, tipo: "entrada" }, s.chave) }); } catch {}
-    }
-  });
+.sala footer {
+  padding: 11px 14px calc(11px + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--linha);
+  flex-shrink: 0;
+}
+.barra { display: flex; gap: 10px; align-items: flex-end; max-width: 680px; margin: 0 auto; }
+#texto {
+  flex: 1; resize: none; max-height: 120px; line-height: 1.5;
+  padding: 13px 17px; border-radius: 22px; background: var(--fundo);
+}
+.enviar {
+  width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+  background: var(--salva); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s, background 0.25s;
+}
+.enviar:hover { background: var(--salva-escura); }
+.enviar:active { transform: scale(0.93); }
+.enviar:disabled { opacity: 0.4; }
+.sala footer .erro { margin: 6px auto 0; max-width: 680px; }
+
+.aviso {
+  position: fixed; left: 50%; right: auto; bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: var(--tinta); color: #fff;
+  font-size: 13.5px; padding: 12px 22px; border-radius: 24px;
+  white-space: nowrap; z-index: 40;
+  box-shadow: 0 8px 26px rgba(44,51,46,0.18);
+  animation: respirar 0.25s ease both;
 }
 
-async function receber(code, msg, doHistorico) {
-  const s = vivas.get(code);
-  if (!s) return;
-  let claro = null;
-  try { claro = await decifrar(msg.ct, s.chave); } catch {}
+@media (min-width: 600px) { .balao { max-width: 66%; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
-  const item = {
-    id: msg.id, t: msg.t,
-    autor: claro ? String(claro.n || "?").slice(0, 20) : "—",
-    txt: claro ? String(claro.txt || "") : "",
-    tipo: claro?.tipo || "",
-    ilegivel: !claro,
-  };
-  s.msgs.push(item);
-  if (s.msgs.length > 300) s.msgs.shift();
+/* ---------- Chamada ---------- */
 
-  if (item.tipo === "entrada" && item.autor !== nome) {
-    if (!s.para) { s.para = item.autor; etiquetar(code, item.autor); desenharLista(); }
-    if (code === activa) desenharCabecalho();
-    if (!doHistorico) som.entrou();
-  }
-
-  if (code === activa) {
-    pintar(item, s);
-    if (!doHistorico && item.autor !== nome && item.tipo !== "entrada") som.recebida();
-  } else if (!doHistorico && item.autor !== nome && item.tipo !== "entrada") {
-    s.novas = (s.novas || 0) + 1;
-    som.recebida();
-    desenharLista();
-  }
+.chamada {
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(246, 247, 244, 0.9);
+  backdrop-filter: blur(18px);
+  animation: respirar 0.3s ease both;
 }
 
-/* ---------- Desenhar a conversa ---------- */
-
-let ultimoAutor = null, ultimoElemento = null;
-
-function sistema(txt) {
-  const p = document.createElement("p");
-  p.className = "sistema";
-  p.textContent = txt;
-  $("mensagens").append(p);
-  ultimoAutor = null;
-  $("fim").scrollIntoView({ block: "end" });
+.chamada-cartao {
+  width: 100%; max-width: 330px; text-align: center;
+  background: var(--superficie);
+  border: 1px solid var(--linha);
+  border-radius: 26px;
+  padding: 38px 26px 28px;
+  box-shadow: 0 18px 50px rgba(44, 51, 46, 0.12);
 }
 
-function pintar(item, s) {
-  if (item.tipo === "entrada") {
-    sistema(`${item.autor} entrou.`);
-    return;
-  }
-  const div = document.createElement("div");
-  div.className = "msg";
-  const minha = !item.ilegivel && item.autor === nome;
-  if (minha) div.classList.add("minha");
-  if (item.ilegivel) div.classList.add("ilegivel");
-
-  const novoGrupo = item.autor !== ultimoAutor;
-  if (novoGrupo) div.classList.add("inicio-grupo");
-  else if (ultimoElemento) ultimoElemento.classList.remove("fim-grupo");
-  div.classList.add("fim-grupo");
-
-  const balao = document.createElement("div");
-  balao.className = "balao";
-  if (novoGrupo && !minha) {
-    const a = document.createElement("span");
-    a.className = "autor";
-    a.textContent = item.autor;
-    a.style.color = corDe(item.autor);
-    balao.append(a);
-  }
-  const p = document.createElement("p");
-  p.className = "corpo";
-  p.textContent = item.ilegivel ? "mensagem cifrada com outra chave" : item.txt;
-  const h = document.createElement("span");
-  h.className = "hora";
-  h.textContent = horas(item.t);
-  balao.append(p, h);
-  div.append(balao);
-
-  $("mensagens").append(div);
-  ultimoAutor = item.autor;
-  ultimoElemento = div;
-  $("fim").scrollIntoView({ behavior: "smooth", block: "end" });
+.chamada-cartao .avatar {
+  width: 84px; height: 84px; font-size: 34px; margin-bottom: 20px;
+  color: #fff;
+}
+.chamada.a-tocar .chamada-cartao .avatar { animation: chamar 1.8s ease-in-out infinite; }
+@keyframes chamar {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(90, 118, 95, 0.28); }
+  50% { box-shadow: 0 0 0 16px rgba(90, 118, 95, 0); }
 }
 
-function desenharConversa() {
-  const s = vivas.get(activa);
-  if (!s) return;
-  $("mensagens").textContent = "";
-  ultimoAutor = null; ultimoElemento = null;
-  for (const m of s.msgs) pintar(m, s);
-  $("fim").scrollIntoView({ block: "end" });
+.chamada-nome {
+  font-family: var(--serif); font-size: 24px; font-weight: 300;
+  margin: 0 0 6px; color: var(--tinta);
+}
+.chamada-estado {
+  font-size: 14px; color: var(--suave); margin: 0 0 28px;
+  font-variant-numeric: tabular-nums;
 }
 
-function desenharCabecalho() {
-  const s = vivas.get(activa);
-  const outro = s?.para || "";
-  $("titulo-sala").textContent = outro ? `Conversa com ${outro}` : "À espera de alguém";
-  $("avatar-sala").textContent = outro ? inicial(outro) : "·";
-  $("avatar-sala").style.background = corDe(outro || activa);
+.chamada-botoes { display: flex; flex-direction: column; gap: 10px; }
+.chamada-botoes button { width: 100%; }
+
+.desligar {
+  padding: 16px 26px; font-size: 15px; font-weight: 500;
+  background: #a35a4e; color: #fff; border-radius: 14px;
+  transition: background 0.25s, transform 0.12s;
 }
+.desligar:hover { background: #8c4c42; }
+.desligar:active { transform: scale(0.99); }
 
-function actualizarSub() {
-  const s = vivas.get(activa);
-  if (!s) return;
-  const p = s.pessoas === undefined ? "" : s.pessoas <= 1 ? "só tu · " : "2 pessoas · ";
-  $("conta").textContent = `${p}termina daqui a ${restante(s.expira)}`;
-}
-
-function abrirConversa(code) {
-  const s = vivas.get(code);
-  if (!s) return;
-  activa = code;
-  s.novas = 0;
-  $("texto").disabled = false;
-  $("b-enviar").disabled = false;
-  erro("e-sala", "");
-  mostrar("v-app");
-  abrirPalco(true);
-  desenharCabecalho();
-  actualizarSub();
-  desenharConversa();
-  desenharLista();
-  history.replaceState(null, "", `/s/${code}#k=${s.k}`);
-}
-
-function voltarAoPainel() {
-  activa = "";
-  abrirPalco(false);
-  desenharLista();
-  history.replaceState(null, "", "/");
-}
-
-/* ---------- Enviar ---------- */
-
-async function enviar() {
-  const txt = $("texto").value.trim();
-  const s = vivas.get(activa);
-  if (!txt || !s) return;
-  if (!socket?.connected) return erro("e-sala", "Sem ligação. Espera um instante.");
-  $("texto").value = "";
-  $("texto").style.height = "auto";
-  som.enviada();
-  try {
-    socket.emit("mensagem", { code: activa, ct: await cifrar({ n: nome, txt }, s.chave) },
-      (r) => erro("e-sala", r?.ok ? "" : r?.erro));
-  } catch {
-    erro("e-sala", "Não foi possível enviar.");
-  }
-}
-
-escutar("b-enviar", "click", enviar);
-escutar("texto", "keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
-});
-escutar("texto", "input", (e) => {
-  e.target.style.height = "auto";
-  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-});
-
-/* ---------- Criar ---------- */
-
-document.querySelectorAll(".opcao").forEach((b) =>
-  b.addEventListener("click", () => {
-    document.querySelectorAll(".opcao").forEach((o) => {
-      o.classList.remove("activa"); o.setAttribute("aria-checked", "false");
-    });
-    b.classList.add("activa"); b.setAttribute("aria-checked", "true");
-    ttl = b.dataset.ttl;
-  })
-);
-
-async function criarSala() {
-  const n = ($("nome-criar").value.trim() || lerNome()).trim();
-  if (!n) return erro("e-criar", "Escreve o teu nome primeiro.");
-  $("b-criar").disabled = true;
-  $("b-criar").textContent = "A criar…";
-  try {
-    nome = n; guardarNome(n);
-    const chave = await gerarChave();
-    const k = await exportarChave(chave);
-    const r = await fetch("/api/salas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ttl, limite: 2, anfitriao: await cifrar({ nome: n }, chave) }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.erro);
-
-    vivas.set(d.code, { chave, k, para: "", expira: d.expiraEm, msgs: [], novas: 0, dono: true });
-    guardarSala({ code: d.code, k, para: "", expira: d.expiraEm, dono: true });
-    entrarNaConversa(d.code);
-
-    convite = d.code;
-    $("cod-convite").textContent = d.code;
-    $("link-sala").textContent = linkDe(d.code);
-    erro("e-criar", "");
-    mostrar("v-convite");
-  } catch (e) {
-    erro("e-criar", e.message || "Não foi possível criar a conversa.");
-  } finally {
-    $("b-criar").disabled = false;
-    $("b-criar").textContent = "Criar a conversa";
-  }
-}
-
-escutar("b-criar", "click", criarSala);
-escutar("nome-criar", "keydown", (e) => e.key === "Enter" && criarSala());
-
-/* ---------- Convite ---------- */
-
-async function partilharOuCopiar(code) {
-  const link = linkDe(code);
-  if (navigator.share) {
-    try { await navigator.share({ title: "Sala", text: "Conversa privada. Este link expira.", url: link }); return; } catch { return; }
-  }
-  try { await navigator.clipboard.writeText(link); avisar("Link copiado"); }
-  catch { prompt("Copia este link:", link); }
-}
-
-escutar("b-partilhar", "click", () => partilharOuCopiar(convite));
-escutar("b-copiar", "click", () => partilharOuCopiar(convite));
-escutar("b-entrar-minha", "click", () => abrirConversa(convite));
-escutar("b-lista", "click", () => { mostrar("v-app"); abrirPalco(false); desenharLista(); history.replaceState(null, "", "/"); });
-escutar("b-convidar", "click", () => partilharOuCopiar(activa));
-if (navigator.share) $("b-partilhar").classList.remove("oculto");
-
-/* ---------- Entrar por convite ---------- */
-
-async function prepararEntrada() {
-  const code = (location.pathname.split("/s/")[1] || "").toUpperCase().slice(0, 6);
-  const k = new URLSearchParams(location.hash.slice(1)).get("k") || "";
-  mostrar("v-entrada");
-
-  if (!code || !k) {
-    $("titulo-entrada").textContent = "Link incompleto";
-    $("info-entrada").textContent = "Falta a parte depois do #. Pede o link inteiro a quem te convidou.";
-    return;
-  }
-
-  let chave;
-  try { chave = await importarChave(k); } catch {
-    $("titulo-entrada").textContent = "Chave inválida";
-    $("info-entrada").textContent = "Este link está danificado.";
-    return;
-  }
-
-  try {
-    const r = await fetch(`/api/salas/${code}`);
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.erro);
-    let dono = "";
-    if (d.anfitriao) { try { dono = (await decifrar(d.anfitriao, chave)).nome || ""; } catch {} }
-
-    convite = { code, k, chave, expira: d.expiraEm, dono };
-    $("avatar-anfitriao").textContent = inicial(dono || code);
-    $("avatar-anfitriao").style.background = corDe(dono || code);
-    $("titulo-entrada").textContent = dono ? `Bem-vindo à conversa do ${dono}` : `Conversa ${code}`;
-    $("info-entrada").textContent = `Desaparece daqui a ${restante(d.expiraEm)}. Escreve o teu nome para entrar.`;
-    $("nome-entrada").value = lerNome();
-    $("form-entrada").classList.remove("oculto");
-  } catch (e) {
-    $("titulo-entrada").textContent = "Conversa terminada";
-    $("info-entrada").textContent = e.message || "Não foi possível confirmar esta conversa.";
-  }
-}
-
-function entrarPorConvite() {
-  const n = $("nome-entrada").value.trim();
-  if (!n) return erro("e-entrada", "Escreve o teu nome para continuar.");
-  if (!convite?.code) return;
-  nome = n; guardarNome(n); erro("e-entrada", "");
-
-  const { code, k, chave, expira, dono } = convite;
-  vivas.set(code, { chave, k, para: dono, expira, msgs: [], novas: 0, dono: false });
-  guardarSala({ code, k, para: dono, expira, dono: false });
-  entrarNaConversa(code);
-  abrirConversa(code);
-}
-
-escutar("b-entrar", "click", entrarPorConvite);
-escutar("nome-entrada", "keydown", (e) => e.key === "Enter" && entrarPorConvite());
-
-/* ---------- Chamada (WebRTC ponto a ponto) ---------- */
-/* O audio vai directamente de um browser para o outro. A sinalizacao passa pelo
-   servidor mas vai cifrada com a chave da conversa. Para redes fechadas seria
-   preciso um servidor TURN: acrescentar aqui. */
-
-const ICE = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  // { urls: "turn:...", username: "...", credential: "..." },
-];
-
-const chamada = { estado: "parado", code: "", pc: null, stream: null, pendentes: [], oferta: null, inicio: 0, relogio: null, mudo: false };
-
-function ecraChamada(estado, texto) {
-  const s = vivas.get(chamada.code);
-  const outro = s?.para || "alguém";
-  $("chamada").classList.toggle("oculto", estado === "parado");
-  $("chamada").classList.toggle("a-tocar", estado === "a-tocar" || estado === "a-chamar");
-  $("chamada-avatar").textContent = inicial(outro);
-  $("chamada-avatar").style.background = corDe(outro || chamada.code);
-  $("chamada-nome").textContent = outro;
-  $("chamada-estado").textContent = texto || "";
-  $("b-atender").classList.toggle("oculto", estado !== "a-tocar");
-  $("b-silencio").classList.toggle("oculto", estado !== "em-curso");
-}
-
-function contarTempo() {
-  clearInterval(chamada.relogio);
-  chamada.inicio = Date.now();
-  const passo = () => {
-    const s = Math.floor((Date.now() - chamada.inicio) / 1000);
-    $("chamada-estado").textContent =
-      `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-  };
-  passo();
-  chamada.relogio = setInterval(passo, 1000);
-}
-
-async function enviarSinal(objeto) {
-  const s = vivas.get(chamada.code);
-  if (!socket?.connected || !s) return;
-  try { socket.emit("sinal", { code: chamada.code, ct: await cifrar(objeto, s.chave) }); } catch {}
-}
-
-async function criarLigacaoRTC() {
-  chamada.pc = new RTCPeerConnection({ iceServers: ICE });
-  chamada.pc.onicecandidate = (e) => { if (e.candidate) enviarSinal({ tipo: "ice", cand: e.candidate }); };
-  chamada.pc.ontrack = (e) => { $("audio-remoto").srcObject = e.streams[0]; };
-  chamada.pc.onconnectionstatechange = () => {
-    const st = chamada.pc?.connectionState;
-    if (st === "connected" && chamada.estado !== "em-curso") {
-      chamada.estado = "em-curso";
-      pararToque(); som.atendida();
-      ecraChamada("em-curso", "");
-      contarTempo();
-    }
-    if (["failed", "disconnected"].includes(st) && chamada.estado === "em-curso") terminar("A ligação caiu.");
-  };
-  chamada.stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-  chamada.stream.getTracks().forEach((t) => chamada.pc.addTrack(t, chamada.stream));
-}
-
-async function ligarPara() {
-  if (chamada.estado !== "parado" || !activa) return;
-  if (!socket?.connected) return avisar("Sem ligação");
-  chamada.code = activa;
-  try {
-    chamada.estado = "a-chamar";
-    ecraChamada("a-chamar", "A chamar…");
-    tocarChamada("saida");
-    await criarLigacaoRTC();
-    const oferta = await chamada.pc.createOffer();
-    await chamada.pc.setLocalDescription(oferta);
-    await enviarSinal({ tipo: "oferta", sdp: chamada.pc.localDescription });
-  } catch (e) {
-    terminar(e.name === "NotAllowedError" ? "Precisas de dar acesso ao microfone." : "Não foi possível ligar.");
-  }
-}
-
-function limparChamada() {
-  pararToque();
-  clearInterval(chamada.relogio);
-  chamada.stream?.getTracks().forEach((t) => t.stop());
-  try { chamada.pc?.close(); } catch {}
-  Object.assign(chamada, { estado: "parado", pc: null, stream: null, pendentes: [], oferta: null, mudo: false });
-  $("b-silencio").textContent = "Silenciar";
-  $("b-silencio").classList.remove("silenciado");
-  $("audio-remoto").srcObject = null;
-  ecraChamada("parado");
-}
-
-function terminar(motivo) {
-  if (chamada.estado !== "parado") som.desligada();
-  const houve = chamada.estado === "em-curso";
-  const dur = houve ? Math.floor((Date.now() - chamada.inicio) / 1000) : 0;
-  const onde = chamada.code;
-  limparChamada();
-  if (motivo) avisar(motivo);
-  if (houve && onde === activa) sistema(`Chamada terminada · ${Math.floor(dur / 60)}m ${dur % 60}s`);
-}
-
-function desligar() {
-  if (chamada.estado === "parado") return;
-  enviarSinal({ tipo: "fim" });
-  terminar(null);
-}
-
-function alternarSilencio() {
-  if (!chamada.stream) return;
-  chamada.mudo = !chamada.mudo;
-  chamada.stream.getAudioTracks().forEach((t) => (t.enabled = !chamada.mudo));
-  $("b-silencio").textContent = chamada.mudo ? "Ligar o microfone" : "Silenciar";
-  $("b-silencio").classList.toggle("silenciado", chamada.mudo);
-}
-
-async function receberSinal({ code, ct }) {
-  const s = vivas.get(code);
-  if (!s) return;
-  let sinal;
-  try { sinal = await decifrar(ct, s.chave); } catch { return; }
-
-  if (sinal.tipo === "oferta") {
-    if (chamada.estado !== "parado") {
-      const antes = chamada.code;
-      chamada.code = code;
-      await enviarSinal({ tipo: "ocupado" });
-      chamada.code = antes;
-      return;
-    }
-    chamada.code = code;
-    chamada.estado = "a-tocar";
-    chamada.pendentes = [];
-    chamada.oferta = sinal.sdp;
-    if (code !== activa) abrirConversa(code);
-    ecraChamada("a-tocar", "Está a ligar…");
-    tocarChamada("entrada");
-    return;
-  }
-  if (code !== chamada.code) return;
-
-  if (sinal.tipo === "resposta" && chamada.pc) {
-    try { await chamada.pc.setRemoteDescription(sinal.sdp); } catch {}
-    return;
-  }
-  if (sinal.tipo === "ice") {
-    if (chamada.pc?.remoteDescription) { try { await chamada.pc.addIceCandidate(sinal.cand); } catch {} }
-    else chamada.pendentes.push(sinal.cand);
-    return;
-  }
-  if (sinal.tipo === "fim") { terminar(null); return; }
-  if (sinal.tipo === "ocupado") { terminar("A pessoa está ocupada."); return; }
-}
-
-escutar("b-chamar", "click", ligarPara);
-escutar("b-desligar", "click", desligar);
-escutar("b-silencio", "click", alternarSilencio);
-escutar("b-atender", "click", async () => {
-  if (!chamada.oferta) return;
-  const oferta = chamada.oferta;
-  chamada.oferta = null;
-  pararToque();
-  try {
-    ecraChamada("em-curso", "A ligar…");
-    await criarLigacaoRTC();
-    await chamada.pc.setRemoteDescription(oferta);
-    for (const c of chamada.pendentes) { try { await chamada.pc.addIceCandidate(c); } catch {} }
-    chamada.pendentes = [];
-    const resposta = await chamada.pc.createAnswer();
-    await chamada.pc.setLocalDescription(resposta);
-    await enviarSinal({ tipo: "resposta", sdp: chamada.pc.localDescription });
-  } catch (e) {
-    await enviarSinal({ tipo: "fim" });
-    terminar(e.name === "NotAllowedError" ? "Precisas de dar acesso ao microfone." : "Não foi possível atender.");
-  }
-});
-
-/* ---------- Navegação ---------- */
-
-function irParaCriar() {
-  const meu = lerNome();
-  $("campo-eu").classList.toggle("oculto", !!meu);
-  $("nome-criar").value = meu;
-  $("b-voltar").classList.toggle("oculto", !lerArquivo().length);
-  erro("e-criar", "");
-  mostrar("v-criar");
-  $("nome-criar").focus();
-}
-
-escutar("b-nova", "click", irParaCriar);
-escutar("b-voltar", "click", () => { mostrar("v-app"); abrirPalco(!!activa); desenharLista(); });
-escutar("b-sair", "click", voltarAoPainel);
-escutar("b-voltar-lista", "click", voltarAoPainel);
-escutar("b-eu", "click", () => {
-  const novo = prompt("O teu nome:", lerNome());
-  if (novo && novo.trim()) { nome = novo.trim().slice(0, 20); guardarNome(nome); desenharLista(); }
-});
-
-const menu = $("menu");
-escutar("b-menu", "click", (e) => { e.stopPropagation(); menu.classList.toggle("oculto"); });
-document.addEventListener("click", () => menu.classList.add("oculto"));
-escutar("b-fechar", "click", () => {
-  if (!activa || !confirm("Isto apaga a conversa para as duas partes. Continuar?")) return;
-  const alvo = activa;
-  socket?.emit("fechar", { code: alvo });
-  vivas.delete(alvo);
-  esquecerSala(alvo);
-  voltarAoPainel();
-});
-
-setInterval(() => { if (activa) actualizarSub(); }, 30000);
-
-/* ---------- Arranque ---------- */
-
-window.addEventListener("error", (e) => {
-  if (document.querySelectorAll(".ecra:not(.oculto), .app:not(.oculto)").length === 0) {
-    $("v-criar").classList.remove("oculto");
-    $("e-criar").textContent = "Algo falhou ao carregar: " + (e.message || "erro desconhecido");
-  }
-});
-
-async function restaurar() {
-  nome = lerNome();
-  const guardadas = lerArquivo().filter((x) => Date.now() < x.expira);
-  for (const g of guardadas) {
-    try {
-      vivas.set(g.code, {
-        chave: await importarChave(g.k), k: g.k, para: g.para || "",
-        expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
-      });
-    } catch {}
-  }
-  if (vivas.size && nome) { garantirSocket(); for (const c of vivas.keys()) entrarNaConversa(c); }
-}
-
-async function arrancar() {
-  const noLink = location.pathname.startsWith("/s/");
-  const codeLink = noLink ? (location.pathname.split("/s/")[1] || "").toUpperCase().slice(0, 6) : "";
-  const jaTenho = lerArquivo().some((x) => x.code === codeLink);
-
-  await restaurar();
-
-  if (noLink && jaTenho && nome) { desenharLista(); abrirConversa(codeLink); return; }
-  if (noLink) { await prepararEntrada(); return; }
-  if (lerArquivo().length && nome) { desenharLista(); mostrar("v-app"); abrirPalco(false); return; }
-  irParaCriar();
-}
-
-arrancar().catch((e) => { console.error(e); irParaCriar(); });
+.silenciado { background: var(--veu) !important; color: var(--tinta) !important; }
