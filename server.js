@@ -18,6 +18,7 @@ const MAX_HISTORICO = 200;
 const MAX_PAYLOAD = 8000; // bytes de texto cifrado
 const CRIAR_POR_IP = { max: 20, janela: 60 * 60 * 1000 };
 const ENVIAR_POR_LIGACAO = { max: 15, janela: 10 * 1000 };
+const SINAIS_POR_LIGACAO = { max: 300, janela: 60 * 1000 };
 
 /** @type {Map<string, {code:string, expiraEm:number, msgs:Array, criadaEm:number}>} */
 const salas = new Map();
@@ -114,6 +115,7 @@ const io = new Server(http, { maxHttpBufferSize: 1e5, pingTimeout: 20000 });
 io.on("connection", (socket) => {
   let salaAtual = null;
   const envios = new Map();
+  const sinais = new Map();
 
   socket.on("entrar", async ({ code } = {}, ack) => {
     if (salaAtual) return;
@@ -151,12 +153,22 @@ io.on("connection", (socket) => {
     ack?.({ ok: true });
   });
 
+  // Sinalizacao das chamadas. O conteudo vai cifrado: o servidor apenas reencaminha.
+  socket.on("sinal", ({ ct } = {}) => {
+    if (!salaAtual) return;
+    if (typeof ct !== "string" || !ct || ct.length > 20000) return;
+    if (!limitar(sinais, "self", SINAIS_POR_LIGACAO)) return;
+    if (!salaViva(salaAtual)) return;
+    socket.to(salaAtual).emit("sinal", { ct });
+  });
+
   socket.on("fechar", () => {
     if (salaAtual) destruirSala(salaAtual, "Alguém fechou a sala.");
   });
 
   socket.on("disconnect", () => {
     if (!salaAtual) return;
+    socket.to(salaAtual).emit("saiu");
     const n = io.sockets.adapter.rooms.get(salaAtual)?.size ?? 0;
     io.to(salaAtual).emit("presenca", { n });
   });
