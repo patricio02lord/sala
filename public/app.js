@@ -5,7 +5,7 @@
 const $ = (id) => document.getElementById(id) || document.createElement("span");
 const escutar = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
 const ECRAS = ["v-criar", "v-convite", "v-entrada", "v-sala"];
-const CORES = ["#ffffff", "#c9c9c9", "#a0a0a0", "#7d7d7d", "#e0e0e0", "#8e8e8e"];
+const CORES = ["#5a765f", "#7a6b59", "#5c6b80", "#785f76", "#6b7752", "#82665a"];
 
 let chave = null, chaveTexto = "", codigo = "", nome = "", anfitriao = "";
 let ttl = "24h", socket = null, expiraEm = 0, jaEntrou = false, para = "";
