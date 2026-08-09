@@ -33,7 +33,7 @@ html, body {
     radial-gradient(ellipse 90% 55% at 50% -12%, rgba(255,255,255,0.95), transparent 65%),
     radial-gradient(ellipse 70% 45% at 78% 105%, rgba(90,118,95,0.07), transparent 70%);
 }
-.ecra, .sala { position: relative; z-index: 1; }
+.ecra, .app { position: relative; z-index: 1; }
 
 .oculto { display: none !important; }
 .centro { text-align: center; }
@@ -216,13 +216,68 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
   border: 1px dashed var(--linha); border-radius: 16px;
 }
 
+/* ---------- Estrutura: painel + palco ---------- */
+
+.app { display: flex; height: var(--alt); overflow: hidden; }
+
+.painel {
+  width: 340px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+  border-right: 1px solid var(--linha);
+}
+.painel-topo {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 20px 14px; padding-top: calc(18px + env(safe-area-inset-top));
+}
+.painel-topo .marca { margin-bottom: 0; }
+.painel-corpo { flex: 1; overflow-y: auto; padding: 6px 16px 10px; }
+.painel-fundo {
+  padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--linha);
+}
+.painel-fundo .nota { margin-top: 12px; font-size: 12px; }
+.painel-corpo .titulo-lista { font-size: 22px; margin: 6px 0 14px; }
+
+.palco { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.palco-nada {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+  text-align: center; color: var(--leve); font-size: 15px; line-height: 1.7;
+  padding: 30px;
+}
+.marca-icone.grande {
+  width: 46px; height: 46px; opacity: 0.28; animation: pulsar 6s ease-in-out infinite;
+}
+.palco-nada p { margin: 0; }
+
+.item.activa {
+  background: var(--salva-fundo);
+  border-color: #c9dbcc;
+}
+.item.activa .item-nome { color: var(--salva-escura); }
+
+.so-telemovel { display: none !important; }
+
+@media (max-width: 860px) {
+  .app { position: relative; }
+  .painel { width: 100%; border-right: none; }
+  .palco { display: none; }
+  .app.com-sala .painel { display: none; }
+  .app.com-sala .palco { display: flex; }
+  .so-telemovel { display: flex !important; align-items: center; }
+  .palco-nada { display: none; }
+}
+
 /* ---------- Conversa ---------- */
 
-.sala { display: flex; flex-direction: column; height: var(--alt); background: var(--fundo); }
+.sala { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--fundo); }
 
 .sala header {
-  position: relative; display: flex; align-items: center; gap: 12px;
-  padding: 11px 16px; padding-top: calc(11px + env(safe-area-inset-top));
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; padding-top: calc(11px + env(safe-area-inset-top));
   background: rgba(255,255,255,0.85);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--linha);
