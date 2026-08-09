@@ -79,11 +79,16 @@ app.post("/api/salas", (req, res) => {
     return res.status(429).json({ erro: "Abriste salas a mais. Espera uma hora." });
   }
   const ttlMin = TTLS[req.body?.ttl] ?? TTLS["24h"];
+  const anfitriao =
+    typeof req.body?.anfitriao === "string" && req.body.anfitriao.length <= 800
+      ? req.body.anfitriao
+      : "";
   const code = gerarCodigo();
   salas.set(code, {
     code,
     criadaEm: Date.now(),
     expiraEm: Date.now() + ttlMin * 60_000,
+    anfitriao, // texto cifrado no browser: o servidor não o lê
     msgs: [],
   });
   res.json({ code, expiraEm: salas.get(code).expiraEm });
@@ -92,7 +97,7 @@ app.post("/api/salas", (req, res) => {
 app.get("/api/salas/:code", (req, res) => {
   const s = salaViva(req.params.code.toUpperCase());
   if (!s) return res.status(404).json({ erro: "Essa sala não existe ou já expirou." });
-  res.json({ code: s.code, expiraEm: s.expiraEm });
+  res.json({ code: s.code, expiraEm: s.expiraEm, anfitriao: s.anfitriao });
 });
 
 app.get("/s/:code", (_req, res) => res.sendFile(join(__dirname, "public", "index.html")));
