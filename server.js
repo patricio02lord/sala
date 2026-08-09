@@ -19,6 +19,11 @@ const MAX_PAYLOAD = 8000;
 const CRIAR_POR_IP = { max: 20, janela: 60 * 60 * 1000 };
 const ENVIAR_POR_LIGACAO = { max: 15, janela: 10 * 1000 };
 const SINAIS_POR_LIGACAO = { max: 300, janela: 60 * 1000 };
+const TENTATIVAS_POR_IP = { max: 10, janela: 60 * 60 * 1000 };
+
+// Só quem souber esta palavra-passe pode criar conversas.
+// Define-a no Render em Environment como CHAVE_DONO.
+const CHAVE_DONO = process.env.CHAVE_DONO || "";
 
 /* ------------------------------------------------------------------ *
  * Armazém: Upstash Redis quando configurado, memória caso contrário.
@@ -107,6 +112,7 @@ const segundosAte = (quando) => Math.max(60, Math.ceil((quando - Date.now()) / 1
 /* ------------------------------------------------------------------ */
 
 const criacoesPorIp = new Map();
+const tentativasPorIp = new Map();
 
 function limitar(mapa, chave, regra) {
   const agora = Date.now();
@@ -155,11 +161,35 @@ app.use((_req, res, next) => {
 app.use(express.static(join(__dirname, "public"), { etag: true, maxAge: 0 }));
 
 app.get("/estado", (_req, res) =>
-  res.json({ ok: true, armazem: COM_REDIS ? "redis" : "memoria" })
+  res.json({
+    ok: true,
+    armazem: COM_REDIS ? "redis" : "memoria",
+    fechado: Boolean(CHAVE_DONO),
+  })
 );
+
+// Confirma a palavra-passe sem criar nada, para o ecrã de entrada do dono.
+app.post("/api/dono", (req, res) => {
+  if (!CHAVE_DONO) return res.json({ ok: true, aberto: true });
+  if (!limitar(tentativasPorIp, req.ip, TENTATIVAS_POR_IP)) {
+    return res.status(429).json({ erro: "Demasiadas tentativas. Espera uma hora." });
+  }
+  if (req.body?.chave !== CHAVE_DONO) {
+    return res.status(401).json({ erro: "Palavra-passe errada." });
+  }
+  res.json({ ok: true });
+});
 
 app.post("/api/salas", async (req, res) => {
   try {
+    if (CHAVE_DONO) {
+      if (!limitar(tentativasPorIp, req.ip, TENTATIVAS_POR_IP)) {
+        return res.status(429).json({ erro: "Demasiadas tentativas. Espera uma hora." });
+      }
+      if (req.get("x-dono") !== CHAVE_DONO) {
+        return res.status(401).json({ erro: "Só o dono pode criar conversas aqui." });
+      }
+    }
     if (await armazem.cheio()) {
       return res.status(503).json({ erro: "O servidor está cheio. Tenta daqui a pouco." });
     }
@@ -302,7 +332,11 @@ if (!COM_REDIS) {
 }
 
 http.listen(PORT, () =>
-  console.log(`sala a correr em http://localhost:${PORT} · armazém: ${COM_REDIS ? "Upstash Redis" : "memória"}`)
+  console.log(
+    `sala a correr em http://localhost:${PORT}` +
+    ` · armazém: ${COM_REDIS ? "Upstash Redis" : "memória"}` +
+    ` · criação: ${CHAVE_DONO ? "só o dono" : "aberta"}`
+  )
 );
 
 export { app, armazem, memoria };
