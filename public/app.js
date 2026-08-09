@@ -4,7 +4,7 @@
 
 const $ = (id) => document.getElementById(id) || document.createElement("span");
 const escutar = (id, ev, fn) => document.getElementById(id)?.addEventListener(ev, fn);
-const ECRAS = ["v-criar", "v-convite", "v-entrada", "v-sala"];
+const ECRAS = ["v-app", "v-criar", "v-convite", "v-entrada"];
 const CORES = ["#5a765f", "#7a6b59", "#5c6b80", "#785f76", "#6b7752", "#82665a"];
 
 let chave = null, chaveTexto = "", codigo = "", nome = "", anfitriao = "";
@@ -123,7 +123,7 @@ function desenharLista() {
   for (const sala of v) {
     const morta = Date.now() > sala.expira;
     const item = document.createElement("div");
-    item.className = "item" + (morta ? " morta" : "");
+    item.className = "item" + (morta ? " morta" : "") + (sala.code === codigo ? " activa" : "");
 
     const av = document.createElement("div");
     av.className = "item-avatar";
@@ -167,6 +167,9 @@ function desenharLista() {
 }
 
 async function abrirGuardada(sala) {
+  if (!sala) return;
+  if (codigo && codigo !== sala.code) largarSala();
+  else if (codigo === sala.code) { abrirPalco(true); return; }
   codigo = sala.code;
   chaveTexto = sala.k;
   para = sala.para || "";
@@ -186,6 +189,7 @@ async function abrirGuardada(sala) {
   anfitriao = para;
   history.replaceState(null, "", `/s/${codigo}#k=${chaveTexto}`);
   ligar();
+  desenharLista();
 }
 
 /* ---------- 1. Criar ---------- */
@@ -394,6 +398,30 @@ async function acrescentar(msg) {
   aoFundo(true);
 }
 
+function abrirPalco(aberta) {
+  $("v-app").classList.toggle("com-sala", aberta);
+  $("v-sala").classList.toggle("oculto", !aberta);
+  $("v-nada").classList.toggle("oculto", aberta);
+}
+
+function largarSala() {
+  limparChamada();
+  socket?.removeAllListeners?.();
+  socket?.disconnect();
+  socket = null;
+  jaEntrou = false;
+  ultimoAutor = null;
+  ultimoElemento = null;
+  $("mensagens").textContent = "";
+  $("texto").value = "";
+  $("texto").disabled = false;
+  $("b-enviar").disabled = false;
+  erro("e-sala", "");
+  codigo = ""; chave = null; chaveTexto = "";
+  para = ""; anfitriao = ""; expiraEm = 0;
+  history.replaceState(null, "", "/");
+}
+
 function desenharCabecalho() {
   const outro = para || anfitriao;
   $("titulo-sala").textContent = outro ? `Conversa com ${outro}` : "À espera de alguém";
@@ -408,7 +436,8 @@ function actualizarSub(n) {
 
 function ligar() {
   if (!chave || !codigo) return;
-  mostrar("v-sala");
+  mostrar("v-app");
+  abrirPalco(true);
   desenharCabecalho();
   actualizarSub();
   ajustarAltura();
@@ -495,13 +524,14 @@ const menu = $("menu");
 escutar("b-menu", "click", (e) => { e.stopPropagation(); menu.classList.toggle("oculto"); });
 document.addEventListener("click", () => menu.classList.add("oculto"));
 escutar("b-convidar", "click", () => (navigator.share ? partilhar() : copiar()));
-escutar("b-sair", "click", () => { limparChamada(); socket?.disconnect(); location.href = "/"; });
+escutar("b-sair", "click", irParaLista);
+escutar("b-voltar-lista", "click", voltarAoPainel);
 
 escutar("b-fechar", "click", () => {
-  if (confirm("Isto apaga a sala para toda a gente. Continuar?")) {
-    socket?.emit("fechar");
-    setTimeout(() => (location.href = "/"), 400);
-  }
+  if (!confirm("Isto apaga a conversa para toda a gente. Continuar?")) return;
+  const alvo = codigo;
+  socket?.emit("fechar");
+  setTimeout(() => { esquecerSala(alvo); irParaLista(); }, 350);
 });
 
 /* ---------- Som ---------- */
@@ -749,12 +779,19 @@ escutar("b-atender", "click", async () => {
 /* ---------- Navegação ---------- */
 
 function irParaLista() {
-  history.replaceState(null, "", "/");
+  largarSala();
   desenharLista();
-  mostrar("v-lista");
+  mostrar("v-app");
+  abrirPalco(false);
+}
+
+function voltarAoPainel() {
+  $("v-app").classList.remove("com-sala");
+  desenharLista();
 }
 
 function irParaCriar() {
+  if (codigo) largarSala();
   const meu = lerNome();
   $("campo-eu").classList.toggle("oculto", !!meu);
   $("nome-criar").value = meu;
@@ -804,7 +841,9 @@ if (location.pathname.startsWith("/s/")) {
     prepararEntrada();
   }
 } else if (lerArquivo().length) {
-  irParaLista();
+  desenharLista();
+  mostrar("v-app");
+  abrirPalco(false);
 } else {
   irParaCriar();
 }
