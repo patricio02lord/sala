@@ -70,7 +70,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(join(__dirname, "public"), { maxAge: "1h" }));
+app.use(express.static(join(__dirname, "public"), { etag: true, maxAge: 0 }));
 
 app.post("/api/salas", (req, res) => {
   if (salas.size >= MAX_SALAS) {
