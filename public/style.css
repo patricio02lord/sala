@@ -33,12 +33,17 @@ html, body {
     radial-gradient(ellipse 90% 55% at 50% -12%, rgba(255,255,255,0.95), transparent 65%),
     radial-gradient(ellipse 70% 45% at 78% 105%, rgba(90,118,95,0.07), transparent 70%);
 }
-body > *:not(.luz) { position: relative; z-index: 1; }
+.ecra, .sala { position: relative; z-index: 1; }
 
 .oculto { display: none !important; }
 .centro { text-align: center; }
 
-button { cursor: pointer; font-family: var(--sans); border: none; color: inherit; }
+button {
+  cursor: pointer; font-family: var(--sans); border: none; color: inherit;
+  transition: transform 0.09s ease, filter 0.2s ease, background 0.25s, border-color 0.25s;
+}
+button:active { transform: scale(0.965); }
+.icone:active { transform: scale(0.88); }
 button:focus-visible, input:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--salva); outline-offset: 3px;
 }
@@ -307,7 +312,7 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
 .sala footer .erro { margin: 6px auto 0; max-width: 680px; }
 
 .aviso {
-  position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom));
+  position: fixed; left: 50%; right: auto; bottom: calc(88px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   background: var(--tinta); color: #fff;
   font-size: 13.5px; padding: 12px 22px; border-radius: 24px;
@@ -322,7 +327,7 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
 /* ---------- Chamada ---------- */
 
 .chamada {
-  position: fixed; inset: 0; z-index: 60;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 60;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
   background: rgba(246, 247, 244, 0.9);
