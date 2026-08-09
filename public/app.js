@@ -41,8 +41,8 @@ function avisar(txt) {
   avisoTimer = setTimeout(() => el.classList.add("oculto"), 2200);
 }
 
-const guardarNome = (n) => { try { sessionStorage.setItem("sala:nome", n); } catch {} };
-const lerNome = () => { try { return sessionStorage.getItem("sala:nome") || ""; } catch { return ""; } };
+const guardarNome = (n) => { try { localStorage.setItem("sala:nome", n); } catch {} };
+const lerNome = () => { try { return localStorage.getItem("sala:nome") || ""; } catch { return ""; } };
 const linkDaSala = () => `${location.origin}/s/${codigo}#k=${chaveTexto}`;
 
 /* Altura real com o teclado do telemovel aberto */
@@ -162,7 +162,7 @@ async function abrirGuardada(sala) {
   codigo = sala.code;
   chaveTexto = sala.k;
   para = sala.para || "";
-  nome = lerNome();
+  nome = lerNome() || "Eu";
   try { chave = await importarChave(chaveTexto); } catch { return avisar("Chave inválida"); }
   try {
     const r = await fetch(`/api/salas/${codigo}`);
