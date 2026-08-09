@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="referrer" content="no-referrer" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Sala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+<!-- PORTA -->
+<main id="porta" class="porta">
+  <div class="col">
+    <p class="eyebrow">Sem conta · sem perfil · sem histórico</p>
+    <h1>Uma sala,<br />e mais nada.</h1>
+    <p class="lead">
+      Abre uma sala e passa o link a quem quiseres. Ninguém te encontra por procura, por número
+      ou por sugestão. As mensagens são cifradas no teu browser — o servidor guarda texto que não
+      consegue ler. Quando o tempo acaba, a sala desaparece.
+    </p>
+
+    <label class="rotulo" for="nome">O teu nome aqui dentro</label>
+    <input id="nome" maxlength="20" placeholder="qualquer coisa" autocomplete="off" />
+
+    <div id="bloco-ttl">
+      <span class="rotulo">A sala apaga-se em</span>
+      <div class="opcoes" role="radiogroup" aria-label="Duração da sala">
+        <button class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
+        <button class="opcao activa" data-ttl="24h" role="radio" aria-checked="true">24 horas</button>
+        <button class="opcao" data-ttl="7d" role="radio" aria-checked="false">7 dias</button>
+      </div>
+    </div>
+
+    <button id="abrir" class="principal">Abrir uma sala</button>
+
+    <div id="bloco-entrar">
+      <div class="ou"><span class="risca"></span><span class="eyebrow">ou</span><span class="risca"></span></div>
+      <div class="linha">
+        <input id="codigo" maxlength="6" placeholder="CÓDIGO" class="mono" autocomplete="off" spellcheck="false" />
+        <button id="entrar" class="secundaria">Entrar</button>
+      </div>
+    </div>
+
+    <p id="erro-porta" class="erro" role="alert"></p>
+  </div>
+</main>
+
+<!-- CONVITE (depois de criar) -->
+<main id="convite" class="porta oculto">
+  <div class="col">
+    <p class="eyebrow">Sala aberta</p>
+    <h1>Passa este link.<br />Só a uma pessoa,<br />se quiseres.</h1>
+    <p class="lead">
+      A chave de decifração está depois do <b>#</b> — essa parte do endereço nunca é enviada ao
+      servidor. Quem não tiver o link completo não lê nada.
+    </p>
+    <div class="caixa-link"><code id="link-sala"></code></div>
+    <div class="linha">
+      <button id="copiar" class="principal">Copiar link</button>
+      <button id="ir" class="secundaria">Entrar na sala</button>
+    </div>
+    <p class="nota">Guarda-o agora. Não há forma de o recuperar depois.</p>
+  </div>
+</main>
+
+<!-- SALA -->
+<div id="sala" class="sala oculto">
+  <header>
+    <div>
+      <div class="linha-topo">
+        <span id="codigo-sala" class="mono forte"></span>
+        <button id="copiar-topo" class="ligacao">copiar link</button>
+      </div>
+      <p id="expira" class="mono fraco"></p>
+    </div>
+    <div class="acoes">
+      <span id="presenca" class="mono fraco"></span>
+      <button id="sair" class="ligacao">sair</button>
+      <button id="fechar" class="ligacao destaque">fechar sala</button>
+    </div>
+  </header>
+
+  <section id="fluxo">
+    <div class="col-larga">
+      <p id="vazio" class="mono fraco">Ninguém falou ainda.</p>
+      <div id="mensagens"></div>
+      <div id="fim"></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="col-larga linha">
+      <input id="texto" placeholder="escreve" autocomplete="off" />
+      <button id="enviar" class="principal mono">enviar</button>
+    </div>
+    <p id="erro-sala" class="erro" role="alert"></p>
+  </footer>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js" type="module"></script>
+</body>
+</html>
