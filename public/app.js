@@ -4,7 +4,7 @@
 
 const $ = (id) => document.getElementById(id);
 const ECRAS = ["v-criar", "v-convite", "v-entrada", "v-sala"];
-const CORES = ["#8a5a2b", "#2f4a3a", "#7a3f6d", "#2b5c7a", "#8a3b3b", "#4a5a24"];
+const CORES = ["#ffffff", "#c9c9c9", "#a0a0a0", "#7d7d7d", "#e0e0e0", "#8e8e8e"];
 
 let chave = null, chaveTexto = "", codigo = "", nome = "", anfitriao = "";
 let ttl = "24h", socket = null, expiraEm = 0, jaEntrou = false, para = "";
