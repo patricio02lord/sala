@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0D0B0A" />
+<meta name="theme-color" content="#0F0F0F" />
 <meta name="referrer" content="no-referrer" />
 <meta name="robots" content="noindex, nofollow" />
 <title>Sala</title>
@@ -39,8 +39,8 @@
     </div>
     <h1>Abrir<br />uma passagem.</h1>
     <p class="lead">
-      L&aacute; fora h&aacute; ru&iacute;do, algoritmos e gente a mais. Aqui entra uma pessoa de cada vez, por
-      convite teu. Fecha-se quando o tempo acaba e n&atilde;o deixa rasto.
+      L&aacute; fora h&aacute; ru&iacute;do, algoritmos e gente a mais. Aqui entra uma pessoa, por convite teu,
+      e escolhe o nome dela pr&oacute;pria. Fecha-se quando o tempo acaba e n&atilde;o deixa rasto.
     </p>
 
     <div id="campo-eu">
@@ -48,8 +48,6 @@
       <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" />
     </div>
 
-    <label class="rotulo" for="para-criar">Quem deixas entrar</label>
-    <input id="para-criar" maxlength="20" placeholder="Ana" autocomplete="off" enterkeyhint="go" />
 
     <span class="rotulo">A passagem fecha-se em</span>
     <div class="opcoes" role="radiogroup" aria-label="Duracao">
@@ -68,7 +66,7 @@
   <div class="col">
     <div class="marca"><span class="marca-icone"></span>Sala <span id="cod-convite" class="cod-peq"></span></div>
     <h1>Passagem<br />aberta.</h1>
-    <p class="destinatario">para <span id="para-convite"></span></p>
+    <p class="destinatario" id="para-convite">manda-o a uma pessoa. s&oacute; uma entra.</p>
     <p class="lead">
       A chave vai depois do <b>#</b> e nunca sai do teu aparelho. Sem o link inteiro, ningu&eacute;m
       l&ecirc; nada &mdash; nem quem gere o servidor.
