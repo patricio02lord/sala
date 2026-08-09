@@ -271,6 +271,22 @@ input.grande { padding: 18px; font-size: 17px; text-align: center; margin-bottom
   .palco-nada { display: none; }
 }
 
+/* contador de mensagens por ler */
+.item-direita { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.bolha {
+  min-width: 21px; height: 21px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--salva); color: #fff;
+  font-size: 11.5px; font-weight: 600; border-radius: 11px;
+}
+.item-texto { background: none; border: none; padding: 0; text-align: left; }
+
+/* quem entra por convite nao tem painel nem forma de criar conversas */
+.app.convidado .painel { display: none; }
+.app.convidado .palco { display: flex; }
+.app.convidado .so-telemovel { display: none !important; }
+.app.convidado .palco-nada { display: none; }
+
 /* ---------- Conversa ---------- */
 
 .sala { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--fundo); }
