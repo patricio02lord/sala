@@ -752,3 +752,71 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 }
 .msg.vista .visto-marca { opacity: 1; transform: none; }
 .msg.ultima-vista .visto-marca { color: rgba(255, 255, 255, 0.92); }
+
+
+/* ------------------------------------------------------------------ *
+ * Editar e apagar mensagens
+ * ------------------------------------------------------------------ */
+
+.msg { position: relative; }
+
+.abrir-acoes {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px;
+  color: var(--texto-3); flex-shrink: 0;
+  align-self: center; margin: 0 2px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+.msg.minha .abrir-acoes { order: -1; }
+.msg:hover .abrir-acoes { opacity: 1; pointer-events: auto; }
+.abrir-acoes:hover { background: var(--nivel-2); color: var(--texto); }
+
+.acoes-msg {
+  position: absolute; right: 30px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; flex-direction: column;
+  min-width: 128px; padding: 4px; z-index: 25;
+  background: var(--nivel-2);
+  border: 1px solid var(--linha);
+  border-radius: var(--r-med);
+  box-shadow: var(--sombra-3);
+  animation: menuEntra 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.acoes-msg button {
+  text-align: left; padding: 7px 10px;
+  font-size: 13px; color: var(--texto-2); border-radius: 6px;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.acoes-msg button:hover { background: var(--nivel-3); color: var(--texto); }
+.acoes-msg button.perigo { color: var(--texto-3); }
+.acoes-msg button.perigo:hover { color: var(--texto); }
+
+.editada {
+  font-size: 10px; color: var(--texto-3); margin-right: 2px;
+  font-style: italic; letter-spacing: 0;
+}
+.msg.minha .editada { color: rgba(255, 255, 255, 0.5); }
+
+.msg.apagada .balao {
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+}
+.msg.apagada .corpo {
+  color: var(--texto-3); font-style: italic; font-size: 13.5px;
+}
+.msg.apagada .hora { color: var(--texto-3); }
+
+/* barra de escrita em modo de edição */
+.sala.a-editar footer { box-shadow: inset 0 2px 0 var(--acento); }
+.sala.a-editar #texto { border-color: var(--acento); }
+.sala.a-editar footer::before {
+  content: "A editar · Esc para cancelar";
+  display: block; max-width: 720px; margin: 0 auto 8px;
+  font-size: 11.5px; color: var(--acento-luz);
+}
+
+@media (max-width: 860px) {
+  .abrir-acoes { opacity: 1; pointer-events: auto; }
+}
