@@ -191,7 +191,6 @@ function modoConvidado() {
   $("b-sair").classList.toggle("oculto", convidado);
   $("b-voltar-lista").classList.toggle("oculto", convidado);
   $("b-fechar").classList.toggle("oculto", convidado);
-  document.body.classList.toggle("sem-painel", convidado);
 }
 
 function desenharLista() {
