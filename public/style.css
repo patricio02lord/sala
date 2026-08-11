@@ -695,3 +695,24 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   background: var(--acento); opacity: 0.55;
 }
 .nada-lista li:last-child { margin-bottom: 0; }
+
+
+/* ------------------------------------------------------------------ *
+ * Barra de vida: a conversa a desaparecer, à vista
+ * ------------------------------------------------------------------ */
+
+.vida {
+  height: 2px; flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.035);
+  overflow: hidden;
+}
+.vida span {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.35), var(--acento-luz));
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.5);
+  transform-origin: left center;
+  transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* última hora: a linha respira devagar, sem alarmes */
+.vida.fim span { animation: expira 2.8s ease-in-out infinite; }
+@keyframes expira { 50% { opacity: 0.45; } }
