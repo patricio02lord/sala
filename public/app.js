@@ -312,6 +312,30 @@ function garantirSocket() {
 
   socket.on("mensagem", ({ code, ...msg }) => receber(code, msg, false));
 
+  socket.on("alterada", async ({ code, id, ct, editada }) => {
+    const s = vivas.get(code);
+    if (!s) return;
+    const item = s.msgs.find((m) => m.id === id);
+    if (!item) return;
+    try {
+      const claro = await decifrar(ct, s.chave);
+      item.txt = String(claro.txt || "");
+      item.ilegivel = false;
+    } catch { item.ilegivel = true; }
+    item.editada = editada;
+    if (code === activa) desenharConversa();
+  });
+
+  socket.on("removida", ({ code, id }) => {
+    const s = vivas.get(code);
+    if (!s) return;
+    const item = s.msgs.find((m) => m.id === id);
+    if (!item) return;
+    item.apagada = Date.now();
+    item.txt = "";
+    if (code === activa) desenharConversa();
+  });
+
   socket.on("presenca", ({ code, n }) => {
     const s = vivas.get(code);
     if (s) s.pessoas = n;
@@ -383,6 +407,8 @@ async function receber(code, msg, doHistorico) {
     txt: claro ? String(claro.txt || "") : "",
     tipo: claro?.tipo || "",
     ilegivel: !claro,
+    editada: msg.editada || 0,
+    apagada: msg.apagada || 0,
   };
   s.msgs.push(item);
   if (s.msgs.length > 300) s.msgs.shift();
@@ -436,6 +462,75 @@ function marcarVistas(s) {
   if (ultimaVista) ultimaVista.classList.add("ultima-vista");
 }
 
+/* ---------- Editar e apagar (janela de 20 minutos) ---------- */
+/* O servidor impõe o mesmo limite: esconder o botão não chegaria. */
+
+const JANELA_EDICAO = 20 * 60 * 1000;
+let aEditar = null;   // { code, id }
+
+const podeMexer = (item) => !item.apagada && Date.now() - item.t <= JANELA_EDICAO;
+
+function fecharAcoes() {
+  document.querySelectorAll(".acoes-msg").forEach((el) => el.remove());
+}
+
+function abrirAcoes(div, item) {
+  fecharAcoes();
+  const cx = document.createElement("div");
+  cx.className = "acoes-msg";
+
+  const bEd = document.createElement("button");
+  bEd.textContent = "Editar";
+  bEd.addEventListener("click", (e) => { e.stopPropagation(); fecharAcoes(); comecarEdicao(item); });
+
+  const bAp = document.createElement("button");
+  bAp.textContent = "Apagar";
+  bAp.className = "perigo";
+  bAp.addEventListener("click", (e) => { e.stopPropagation(); fecharAcoes(); apagarMensagem(item); });
+
+  cx.append(bEd, bAp);
+  div.append(cx);
+}
+
+function comecarEdicao(item) {
+  if (!podeMexer(item)) return avisar("Já passaram os 20 minutos");
+  aEditar = { code: activa, id: item.id };
+  $("texto").value = item.txt;
+  $("texto").focus();
+  $("texto").style.height = "auto";
+  $("texto").style.height = Math.min($("texto").scrollHeight, 140) + "px";
+  $("v-sala").classList.add("a-editar");
+}
+
+function cancelarEdicao() {
+  aEditar = null;
+  $("texto").value = "";
+  $("texto").style.height = "auto";
+  $("v-sala").classList.remove("a-editar");
+}
+
+async function guardarEdicao() {
+  const txt = $("texto").value.trim();
+  const s = vivas.get(aEditar.code);
+  if (!s || !socket?.connected) return;
+  if (!txt) { cancelarEdicao(); return; }
+  const alvo = aEditar;
+  cancelarEdicao();
+  try {
+    socket.emit("alterar", { code: alvo.code, id: alvo.id, ct: await cifrar({ n: nome, txt }, s.chave) },
+      (r) => { if (!r?.ok) avisar(r?.erro || "Não foi possível editar."); });
+  } catch { avisar("Não foi possível editar."); }
+}
+
+function apagarMensagem(item) {
+  if (!podeMexer(item)) return avisar("Já passaram os 20 minutos");
+  if (!confirm("Apagar esta mensagem para as duas partes?")) return;
+  socket?.emit("remover", { code: activa, id: item.id },
+    (r) => { if (!r?.ok) avisar(r?.erro || "Não foi possível apagar."); });
+}
+
+document.addEventListener("click", fecharAcoes);
+
 /* ---------- Desenhar a conversa ---------- */
 
 let ultimoAutor = null, ultimoElemento = null;
@@ -456,7 +551,9 @@ function pintar(item, s) {
   }
   const div = document.createElement("div");
   div.className = "msg";
+  div.dataset.id = item.id;
   const minha = !item.ilegivel && item.autor === nome;
+  if (item.apagada) div.classList.add("apagada");
   if (minha) div.classList.add("minha");
   if (item.ilegivel) div.classList.add("ilegivel");
 
@@ -475,11 +572,21 @@ function pintar(item, s) {
   }
   const p = document.createElement("p");
   p.className = "corpo";
-  p.textContent = item.ilegivel ? "mensagem cifrada com outra chave" : item.txt;
+  p.textContent = item.apagada
+    ? "Mensagem apagada"
+    : item.ilegivel
+      ? "mensagem cifrada com outra chave"
+      : item.txt;
   const h = document.createElement("span");
   h.className = "hora";
   h.textContent = horas(item.t);
-  if (minha) {
+  if (item.editada && !item.apagada) {
+    const e = document.createElement("span");
+    e.className = "editada";
+    e.textContent = "editada";
+    h.prepend(e);
+  }
+  if (minha && !item.apagada) {
     const v = document.createElement("span");
     v.className = "visto-marca";
     v.setAttribute("aria-label", "Vista");
@@ -493,6 +600,19 @@ function pintar(item, s) {
   balao.append(p, h);
   div.append(balao);
   div.dataset.t = item.t;
+
+  if (minha && !item.apagada) {
+    const b = document.createElement("button");
+    b.className = "abrir-acoes";
+    b.setAttribute("aria-label", "Opções da mensagem");
+    b.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="3.5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="12.5" r="1.3" fill="currentColor"/></svg>';
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!podeMexer(item)) return avisar("Já passaram os 20 minutos");
+      abrirAcoes(div, item);
+    });
+    div.append(b);
+  }
 
   $("mensagens").append(div);
   ultimoAutor = item.autor;
@@ -540,6 +660,7 @@ async function abrirConversa(code) {
   }
   const s = vivas.get(code);
   if (!s) { avisar("Não foi possível abrir esta conversa"); mostrarAlgo(); return; }
+  if (aEditar && aEditar.code !== code) cancelarEdicao();
   activa = code;
   s.novas = 0;
   actualizarAba();
@@ -570,6 +691,7 @@ function voltarAoPainel() {
 /* ---------- Enviar ---------- */
 
 async function enviar() {
+  if (aEditar) return guardarEdicao();
   const txt = $("texto").value.trim();
   const s = vivas.get(activa);
   if (!txt || !s) return;
@@ -587,6 +709,7 @@ async function enviar() {
 
 escutar("b-enviar", "click", enviar);
 escutar("texto", "keydown", (e) => {
+  if (e.key === "Escape" && aEditar) { e.preventDefault(); cancelarEdicao(); return; }
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
 });
 escutar("texto", "input", (e) => {
