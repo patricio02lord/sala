@@ -150,10 +150,6 @@
       <input id="nome-criar" maxlength="20" placeholder="Patricio" autocomplete="off" />
     </div>
 
-    <label class="rotulo" for="palavra-criar">Palavra combinada <span class="opcional">opcional</span></label>
-    <input id="palavra-criar" maxlength="40" placeholder="Deixa vazio para dispensar" autocomplete="off" />
-    <p class="dica">Quem abrir o link ter&aacute; de a escrever. Combina-a por outro meio &mdash; sem ela, o conte&uacute;do &eacute; ileg&iacute;vel.</p>
-
     <span class="rotulo">Expira em</span>
     <div class="opcoes" role="radiogroup" aria-label="Duracao">
       <button type="button" class="opcao" data-ttl="1h" role="radio" aria-checked="false">1 hora</button>
@@ -178,11 +174,6 @@
       Sem o link completo, o conte&uacute;do &eacute; ileg&iacute;vel.
     </p>
 
-    <div id="aviso-palavra" class="aviso-palavra oculto">
-      <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 017 0v2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><rect x="3" y="7" width="10" height="7" rx="2" fill="currentColor"/></svg>
-      <span>Esta conversa pede a palavra combinada. O link sozinho n&atilde;o abre nada.</span>
-    </div>
-
     <div class="qr-caixa">
       <div id="qr" class="qr" role="img" aria-label="C&oacute;digo QR do convite"></div>
       <p class="qr-nota">Aponta a c&acirc;mara para entrar</p>
@@ -206,10 +197,7 @@
     <p id="info-entrada" class="lead centro">A confirmar a conversa&hellip;</p>
 
     <div id="form-entrada" class="oculto">
-      <input id="nome-entrada" maxlength="20" placeholder="Escreve o teu nome" autocomplete="off" class="grande" />
-      <div id="campo-palavra" class="oculto">
-        <input id="palavra-entrada" maxlength="40" type="password" placeholder="Palavra combinada" autocomplete="off" enterkeyhint="go" class="grande" />
-      </div>
+      <input id="nome-entrada" maxlength="20" placeholder="Escreve o teu nome" autocomplete="off" enterkeyhint="go" class="grande" />
       <button id="b-entrar" class="principal larga">Entrar</button>
       <p class="nota centro">Sem conta e sem n&uacute;mero de telefone.</p>
     </div>
