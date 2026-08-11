@@ -19,6 +19,7 @@ const MAX_PAYLOAD = 8000;
 const CRIAR_POR_IP = { max: 20, janela: 60 * 60 * 1000 };
 const ENVIAR_POR_LIGACAO = { max: 15, janela: 10 * 1000 };
 const SINAIS_POR_LIGACAO = { max: 300, janela: 60 * 1000 };
+const JANELA_EDICAO = 20 * 60 * 1000;   // 20 minutos para editar ou apagar
 const TENTATIVAS_POR_IP = { max: 10, janela: 60 * 60 * 1000 };
 
 // Só quem souber esta palavra-passe pode criar conversas.
@@ -91,6 +92,29 @@ const armazem = {
     if (!s) return;
     s.msgs.push(msg);
     if (s.msgs.length > MAX_HISTORICO) s.msgs.shift();
+  },
+
+  async substituir(code, id, mudar) {
+    if (COM_REDIS) {
+      const linhas = (await comando("LRANGE", chaveMsgs(code), "0", "-1")) || [];
+      for (let i = 0; i < linhas.length; i++) {
+        const m = JSON.parse(linhas[i]);
+        if (m.id !== id) continue;
+        const novo = mudar(m);
+        if (!novo) return null;
+        await comando("LSET", chaveMsgs(code), String(i), JSON.stringify(novo));
+        return novo;
+      }
+      return null;
+    }
+    const lista = memoria.get(code)?.msgs;
+    if (!lista) return null;
+    const i = lista.findIndex((m) => m.id === id);
+    if (i < 0) return null;
+    const novo = mudar(lista[i]);
+    if (!novo) return null;
+    lista[i] = novo;
+    return novo;
   },
 
   async apagar(code) {
@@ -287,6 +311,60 @@ io.on("connection", (socket) => {
     } catch (e) {
       console.error("mensagem:", e.message);
       ack?.({ ok: false, erro: "Não foi possível enviar." });
+    }
+  });
+
+  socket.on("alterar", async ({ code, id, ct } = {}, ack) => {
+    try {
+      const c = String(code || "").toUpperCase();
+      if (!minhas.has(c)) return ack?.({ ok: false, erro: "Não estás nesta conversa." });
+      if (typeof ct !== "string" || !ct || ct.length > MAX_PAYLOAD) {
+        return ack?.({ ok: false, erro: "Mensagem inválida." });
+      }
+      if (!limitar(envios, "self", ENVIAR_POR_LIGACAO)) {
+        return ack?.({ ok: false, erro: "Devagar." });
+      }
+      if (!(await salaViva(c))) return ack?.({ ok: false, erro: "A conversa terminou." });
+
+      let recusa = null;
+      const novo = await armazem.substituir(c, String(id || ""), (m) => {
+        if (m.apagada) { recusa = "Esta mensagem já foi apagada."; return null; }
+        if (Date.now() - m.t > JANELA_EDICAO) { recusa = "Já passaram os 20 minutos."; return null; }
+        return { ...m, ct, editada: Date.now() };
+      });
+      if (!novo) return ack?.({ ok: false, erro: recusa || "Mensagem não encontrada." });
+
+      io.to(c).emit("alterada", { code: c, id: novo.id, ct: novo.ct, editada: novo.editada });
+      ack?.({ ok: true });
+    } catch (e) {
+      console.error("alterar:", e.message);
+      ack?.({ ok: false, erro: "Não foi possível alterar." });
+    }
+  });
+
+  socket.on("remover", async ({ code, id } = {}, ack) => {
+    try {
+      const c = String(code || "").toUpperCase();
+      if (!minhas.has(c)) return ack?.({ ok: false, erro: "Não estás nesta conversa." });
+      if (!limitar(envios, "self", ENVIAR_POR_LIGACAO)) {
+        return ack?.({ ok: false, erro: "Devagar." });
+      }
+      if (!(await salaViva(c))) return ack?.({ ok: false, erro: "A conversa terminou." });
+
+      let recusa = null;
+      const novo = await armazem.substituir(c, String(id || ""), (m) => {
+        if (m.apagada) return m;
+        if (Date.now() - m.t > JANELA_EDICAO) { recusa = "Já passaram os 20 minutos."; return null; }
+        // o texto cifrado desaparece do servidor: nada fica para trás
+        return { id: m.id, t: m.t, apagada: Date.now(), ct: "" };
+      });
+      if (!novo) return ack?.({ ok: false, erro: recusa || "Mensagem não encontrada." });
+
+      io.to(c).emit("removida", { code: c, id: novo.id });
+      ack?.({ ok: true });
+    } catch (e) {
+      console.error("remover:", e.message);
+      ack?.({ ok: false, erro: "Não foi possível apagar." });
     }
   });
 
