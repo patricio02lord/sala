@@ -37,8 +37,16 @@
   <section id="palco" class="palco">
 
     <div id="v-nada" class="palco-nada">
-      <span class="marca-icone grande"></span>
-      <p>Seleciona uma conversa para come&ccedil;ar.</p>
+      <div class="nada-selo" aria-hidden="true">
+        <svg viewBox="0 0 44 44" width="44" height="44"><circle cx="22" cy="22" r="21" stroke="currentColor" stroke-width="1" fill="none" opacity="0.35"/><circle cx="22" cy="22" r="13" stroke="currentColor" stroke-width="1" fill="none" opacity="0.55"/><path d="M18 20v-2.5a4 4 0 018 0V20" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><rect x="16" y="20" width="12" height="8.5" rx="2.5" fill="currentColor"/></svg>
+      </div>
+      <h2 class="nada-titulo">Nenhuma conversa aberta</h2>
+      <p>Seleciona uma conversa &agrave; esquerda ou gera um novo link de convite.</p>
+      <ul class="nada-lista">
+        <li>Cada link serve uma pessoa e expira sozinho</li>
+        <li>As mensagens s&atilde;o cifradas antes de sair deste aparelho</li>
+        <li>O servidor guarda texto que n&atilde;o consegue ler</li>
+      </ul>
     </div>
 
     <div id="v-sala" class="sala oculto">
@@ -51,6 +59,10 @@
           <p id="titulo-sala" class="titulo-sala">Conversa</p>
           <p id="conta" class="sub"></p>
         </div>
+        <span class="selo" title="Cifrado ponta a ponta">
+          <svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 017 0v2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><rect x="3" y="7" width="10" height="7" rx="2" fill="currentColor"/></svg>
+          Cifrado
+        </span>
         <button id="b-chamar" class="icone" aria-label="Ligar">
           <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.58 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.6a1 1 0 0 1-.25 1z" fill="currentColor"/></svg>
         </button>
@@ -102,7 +114,7 @@
 
 <!-- ESPAÇO FECHADO -->
 <main id="v-fechado" class="ecra centrado oculto">
-  <div class="col estreita">
+  <div class="col estreita cartao">
     <span class="marca-icone grande"></span>
     <h1 class="titulo-entrada">Espa&ccedil;o privado</h1>
     <p class="lead centro">
@@ -120,7 +132,7 @@
 
 <!-- CRIAR -->
 <main id="v-criar" class="ecra oculto">
-  <div class="col">
+  <div class="col cartao">
     <div class="lista-topo">
       <div class="marca"><span class="marca-icone"></span>Sala</div>
       <button id="b-voltar" class="ligacao-peq oculto">voltar</button>
@@ -145,12 +157,13 @@
 
     <button id="b-criar" class="principal larga">Gerar link</button>
     <p id="e-criar" class="erro" role="alert"></p>
+    <p class="rodape-selo"><span class="ponto-selo"></span>Cifrado ponta a ponta neste aparelho</p>
   </div>
 </main>
 
 <!-- CONVITE -->
 <main id="v-convite" class="ecra oculto">
-  <div class="col">
+  <div class="col cartao">
     <div class="marca"><span class="marca-icone"></span>Sala <span id="cod-convite" class="cod-peq"></span></div>
     <h1>Link gerado</h1>
     <p class="destinatario" id="para-convite">V&aacute;lido para uma pessoa.</p>
@@ -171,7 +184,7 @@
 
 <!-- BOAS-VINDAS -->
 <main id="v-entrada" class="ecra centrado oculto">
-  <div class="col estreita">
+  <div class="col estreita cartao">
     <div class="avatar" id="avatar-anfitriao">?</div>
     <h1 id="titulo-entrada" class="titulo-entrada">Bem-vindo</h1>
     <p id="info-entrada" class="lead centro">A confirmar a conversa&hellip;</p>
