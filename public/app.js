@@ -176,6 +176,49 @@ document.addEventListener("pointerdown", (e) => {
   if (e.target.closest("button")) { som.toque(); podeVibrar(8); }
 }, { passive: true });
 
+/* ---------- Aviso na aba e barra de vida ---------- */
+
+const ICONE_BASE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234F46E5'/%3E%3Crect x='11' y='10' width='10' height='12' rx='3' fill='%23fff'/%3E%3C/svg%3E";
+const ICONE_AVISO =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%234F46E5'/%3E%3Crect x='11' y='10' width='10' height='12' rx='3' fill='%23fff'/%3E%3Ccircle cx='25' cy='7' r='7' fill='%230B1120'/%3E%3Ccircle cx='25' cy='7' r='4.5' fill='%23fff'/%3E%3C/svg%3E";
+
+function porLer() {
+  let total = 0;
+  for (const s of vivas.values()) total += s.novas || 0;
+  return total;
+}
+
+function actualizarAba() {
+  const n = porLer();
+  document.title = n > 0 ? `(${n}) Sala` : "Sala";
+  const icone = document.querySelector("link[rel='icon']");
+  if (icone) icone.href = n > 0 ? ICONE_AVISO : ICONE_BASE;
+}
+
+/* Se a aba estiver escondida, também a conversa aberta acumula por ler. */
+const abaEscondida = () => document.visibilityState === "hidden";
+
+document.addEventListener("visibilitychange", () => {
+  if (abaEscondida() || !activa) return;
+  const s = vivas.get(activa);
+  if (s?.novas) { s.novas = 0; desenharLista(); }
+  actualizarAba();
+});
+
+function desenharVida() {
+  const s = vivas.get(activa);
+  const barra = $("vida-barra");
+  const caixa = $("vida");
+  if (!s || !s.expira) { barra.style.width = "0%"; return; }
+  const total = s.expira - (s.criada || s.expira - 86400000);
+  const resta = Math.max(0, s.expira - Date.now());
+  const parte = total > 0 ? Math.min(1, resta / total) : 0;
+  barra.style.width = (parte * 100).toFixed(2) + "%";
+  caixa.classList.toggle("fim", resta < 3600000);
+  caixa.title = `Esta conversa desaparece em ${restante(s.expira)}`;
+}
+
 /* ---------- Painel de conversas ---------- */
 
 function abrirPalco(aberta) {
@@ -306,6 +349,8 @@ function entrarNaConversa(code) {
       return;
     }
     s.expira = r.expiraEm;
+    if (r.criadaEm) s.criada = r.criadaEm;
+    if (code === activa) desenharVida();
     const jaTinha = s.iniciada;
     s.iniciada = true;
     s.msgs = [];
@@ -339,13 +384,19 @@ async function receber(code, msg, doHistorico) {
     if (!doHistorico) som.entrou();
   }
 
+  const nova = !doHistorico && item.autor !== nome && item.tipo !== "entrada";
+
   if (code === activa) {
     pintar(item, s);
-    if (!doHistorico && item.autor !== nome && item.tipo !== "entrada") som.recebida();
-  } else if (!doHistorico && item.autor !== nome && item.tipo !== "entrada") {
+    if (nova) {
+      som.recebida();
+      if (abaEscondida()) { s.novas = (s.novas || 0) + 1; actualizarAba(); }
+    }
+  } else if (nova) {
     s.novas = (s.novas || 0) + 1;
     som.recebida();
     desenharLista();
+    actualizarAba();
   }
 }
 
@@ -432,7 +483,7 @@ async function abrirConversa(code) {
       try {
         vivas.set(code, {
           chave: await importarChave(g.k), k: g.k, para: g.para || "",
-          expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
+          criada: g.criada, expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
         });
         entrarNaConversa(code);
       } catch {}
@@ -442,6 +493,7 @@ async function abrirConversa(code) {
   if (!s) { avisar("Não foi possível abrir esta conversa"); mostrarAlgo(); return; }
   activa = code;
   s.novas = 0;
+  actualizarAba();
   $("texto").disabled = false;
   $("b-enviar").disabled = false;
   erro("e-sala", "");
@@ -449,6 +501,7 @@ async function abrirConversa(code) {
   abrirPalco(true);
   desenharCabecalho();
   actualizarSub();
+  desenharVida();
   desenharConversa();
   desenharLista();
   if (chamada.estado !== "parado" && chamada.code === code) ecraChamada(chamada.estado, $("chamada-estado").textContent);
@@ -520,8 +573,8 @@ async function criarSala() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
 
-    vivas.set(d.code, { chave, k, para: "", expira: d.expiraEm, msgs: [], novas: 0, dono: true });
-    guardarSala({ code: d.code, k, para: "", expira: d.expiraEm, dono: true });
+    vivas.set(d.code, { chave, k, para: "", criada: d.criadaEm, expira: d.expiraEm, msgs: [], novas: 0, dono: true });
+    guardarSala({ code: d.code, k, para: "", criada: d.criadaEm, expira: d.expiraEm, dono: true });
     entrarNaConversa(d.code);
 
     convite = d.code;
@@ -585,7 +638,7 @@ async function prepararEntrada() {
     let dono = "";
     if (d.anfitriao) { try { dono = (await decifrar(d.anfitriao, chave)).nome || ""; } catch {} }
 
-    convite = { code, k, chave, expira: d.expiraEm, dono };
+    convite = { code, k, chave, criada: d.criadaEm, expira: d.expiraEm, dono };
     $("avatar-anfitriao").textContent = inicial(dono || code);
     $("avatar-anfitriao").style.background = corDe(dono || code);
     $("titulo-entrada").textContent = dono ? `Bem-vindo à conversa do ${dono}` : `Conversa ${code}`;
@@ -604,9 +657,9 @@ function entrarPorConvite() {
   if (!convite?.code) return;
   nome = n; guardarNome(n); erro("e-entrada", "");
 
-  const { code, k, chave, expira, dono } = convite;
-  vivas.set(code, { chave, k, para: dono, expira, msgs: [], novas: 0, dono: false });
-  guardarSala({ code, k, para: dono, expira, dono: false });
+  const { code, k, chave, criada, expira, dono } = convite;
+  vivas.set(code, { chave, k, para: dono, criada, expira, msgs: [], novas: 0, dono: false });
+  guardarSala({ code, k, para: dono, criada, expira, dono: false });
   entrarNaConversa(code);
   modoConvidado();
   abrirConversa(code);
@@ -875,7 +928,7 @@ escutar("b-fechar", "click", () => {
   voltarAoPainel();
 });
 
-setInterval(() => { if (activa) actualizarSub(); }, 30000);
+setInterval(() => { if (activa) { actualizarSub(); desenharVida(); } }, 30000);
 
 /* ---------- Arranque ---------- */
 
@@ -908,7 +961,7 @@ async function restaurar() {
     try {
       vivas.set(g.code, {
         chave: await importarChave(g.k), k: g.k, para: g.para || "",
-        expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
+        criada: g.criada, expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
       });
     } catch {}
   }
