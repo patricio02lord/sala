@@ -736,3 +736,19 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 @keyframes qrEntra { from { opacity: 0; transform: scale(0.94); } }
 .qr svg { display: block; width: 100%; height: 100%; }
 .qr-nota { font-size: 11.5px; color: var(--texto-3); margin: 12px 0 0; letter-spacing: 0; }
+
+
+/* ------------------------------------------------------------------ *
+ * Confirmação de leitura
+ * ------------------------------------------------------------------ */
+
+.hora { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+
+.visto-marca {
+  display: inline-flex; align-items: center;
+  opacity: 0; transform: translateX(-2px);
+  transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  color: rgba(255, 255, 255, 0.5);
+}
+.msg.vista .visto-marca { opacity: 1; transform: none; }
+.msg.ultima-vista .visto-marca { color: rgba(255, 255, 255, 0.92); }
