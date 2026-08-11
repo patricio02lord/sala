@@ -580,6 +580,7 @@ async function criarSala() {
     convite = d.code;
     $("cod-convite").textContent = d.code;
     $("link-sala").textContent = linkDe(d.code);
+    desenharQR(linkDe(d.code), $("qr"));
     erro("e-criar", "");
     mostrar("v-convite");
   } catch (e) {
@@ -592,6 +593,265 @@ async function criarSala() {
 
 escutar("b-criar", "click", criarSala);
 escutar("nome-criar", "keydown", (e) => e.key === "Enter" && criarSala());
+
+/* ---------- Código QR ---------- */
+/* Gerado aqui dentro, de propósito: o link contém a chave de decifração
+   e não pode ser enviado a nenhum serviço externo de QR.
+   Codificador mínimo: modo byte, correção L, versões 1 a 6.
+   Suficiente para links até 134 caracteres. Sem dependências. */
+
+const CAP = [null, 19, 34, 55, 80, 108, 136];          // codewords de dados por versão
+const ECC = [null, 7, 10, 15, 20, 26, 18];              // codewords de correção por bloco
+const BLOCOS = [null, 1, 1, 1, 1, 1, 2];                // blocos por versão
+const ALINHA = [null, null, 18, 22, 26, 30, 34];        // centro do padrão de alinhamento
+
+/* --- aritmética do campo de Galois --- */
+const EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+(() => {
+  let x = 1;
+  for (let i = 0; i < 255; i++) {
+    EXP[i] = x; LOG[x] = i;
+    x <<= 1; if (x & 0x100) x ^= 0x11d;
+  }
+  for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+})();
+const mul = (a, b) => (a === 0 || b === 0 ? 0 : EXP[LOG[a] + LOG[b]]);
+
+function gerador(grau) {
+  let g = [1];
+  for (let i = 0; i < grau; i++) {
+    const novo = new Array(g.length + 1).fill(0);
+    for (let j = 0; j < g.length; j++) {
+      novo[j] ^= mul(g[j], 1);
+      novo[j + 1] ^= mul(g[j], EXP[i]);
+    }
+    g = novo;
+  }
+  return g;
+}
+
+function correcao(dados, n) {
+  const g = gerador(n);
+  const resto = new Array(n).fill(0);
+  for (const d of dados) {
+    const f = d ^ resto[0];
+    resto.shift(); resto.push(0);
+    if (f !== 0) for (let i = 0; i < n; i++) resto[i] ^= mul(g[i + 1], f);
+  }
+  return resto;
+}
+
+/* --- construção dos codewords --- */
+function codewords(texto) {
+  const bytes = new TextEncoder().encode(texto);
+  let versao = 0;
+  for (let v = 1; v <= 6; v++) if (bytes.length <= CAP[v] - 2) { versao = v; break; }
+  if (!versao) throw new Error("Texto demasiado longo para este codificador.");
+
+  const bits = [];
+  const juntar = (valor, n) => { for (let i = n - 1; i >= 0; i--) bits.push((valor >> i) & 1); };
+  juntar(0b0100, 4);
+  juntar(bytes.length, 8);
+  for (const b of bytes) juntar(b, 8);
+
+  const totalBits = CAP[versao] * 8;
+  for (let i = 0; i < 4 && bits.length < totalBits; i++) bits.push(0);
+  while (bits.length % 8) bits.push(0);
+
+  const dados = [];
+  for (let i = 0; i < bits.length; i += 8) {
+    dados.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
+  }
+  const enchimento = [0xec, 0x11];
+  let i = 0;
+  while (dados.length < CAP[versao]) dados.push(enchimento[i++ % 2]);
+
+  // repartir por blocos e intercalar
+  const nb = BLOCOS[versao];
+  const porBloco = CAP[versao] / nb;
+  const blocosDados = [], blocosEcc = [];
+  for (let b = 0; b < nb; b++) {
+    const parte = dados.slice(b * porBloco, (b + 1) * porBloco);
+    blocosDados.push(parte);
+    blocosEcc.push(correcao(parte, ECC[versao]));
+  }
+  const saida = [];
+  for (let j = 0; j < porBloco; j++) for (const bl of blocosDados) saida.push(bl[j]);
+  for (let j = 0; j < ECC[versao]; j++) for (const bl of blocosEcc) saida.push(bl[j]);
+  return { versao, saida };
+}
+
+/* --- desenho da matriz --- */
+function novaMatriz(n) {
+  return { m: Array.from({ length: n }, () => new Array(n).fill(null)), n };
+}
+
+function padroes(mz, versao) {
+  const { m, n } = mz;
+  const finder = (lin, col) => {
+    for (let i = -1; i <= 7; i++) for (let j = -1; j <= 7; j++) {
+      const y = lin + i, x = col + j;
+      if (y < 0 || y >= n || x < 0 || x >= n) continue;
+      const borda = i >= 0 && i <= 6 && (j === 0 || j === 6) || j >= 0 && j <= 6 && (i === 0 || i === 6);
+      const centro = i >= 2 && i <= 4 && j >= 2 && j <= 4;
+      m[y][x] = borda || centro ? 1 : 0;
+    }
+  };
+  finder(0, 0); finder(0, n - 7); finder(n - 7, 0);
+
+  for (let i = 8; i < n - 8; i++) { m[6][i] = i % 2 === 0 ? 1 : 0; m[i][6] = i % 2 === 0 ? 1 : 0; }
+
+  if (ALINHA[versao]) {
+    const c = ALINHA[versao];
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+      m[c + i][c + j] = Math.max(Math.abs(i), Math.abs(j)) !== 1 ? 1 : 0;
+    }
+  }
+  m[n - 8][8] = 1; // módulo sempre escuro
+}
+
+function reservarFormato(mz) {
+  const { m, n } = mz;
+  for (let i = 0; i < 9; i++) {
+    if (m[8][i] === null) m[8][i] = 2;
+    if (m[i][8] === null) m[i][8] = 2;
+  }
+  for (let i = 0; i < 8; i++) {
+    if (m[8][n - 1 - i] === null) m[8][n - 1 - i] = 2;
+    if (m[n - 1 - i][8] === null) m[n - 1 - i][8] = 2;
+  }
+}
+
+function colocarDados(mz, cw) {
+  const { m, n } = mz;
+  const bits = [];
+  for (const b of cw) for (let i = 7; i >= 0; i--) bits.push((b >> i) & 1);
+  let idx = 0, cima = true;
+  for (let col = n - 1; col > 0; col -= 2) {
+    if (col === 6) col--;
+    for (let passo = 0; passo < n; passo++) {
+      const lin = cima ? n - 1 - passo : passo;
+      for (let k = 0; k < 2; k++) {
+        const c = col - k;
+        if (m[lin][c] !== null) continue;
+        m[lin][c] = idx < bits.length ? bits[idx] : 0;
+        idx++;
+      }
+    }
+    cima = !cima;
+  }
+}
+
+const MASCARAS = [
+  (i, j) => (i + j) % 2 === 0,
+  (i) => i % 2 === 0,
+  (i, j) => j % 3 === 0,
+  (i, j) => (i + j) % 3 === 0,
+  (i, j) => (Math.floor(i / 2) + Math.floor(j / 3)) % 2 === 0,
+  (i, j) => ((i * j) % 2) + ((i * j) % 3) === 0,
+  (i, j) => (((i * j) % 2) + ((i * j) % 3)) % 2 === 0,
+  (i, j) => (((i + j) % 2) + ((i * j) % 3)) % 2 === 0,
+];
+
+function penalidade(m, n) {
+  let p = 0;
+  const linhaP = (get) => {
+    for (let i = 0; i < n; i++) {
+      let cor = -1, seguidos = 0;
+      for (let j = 0; j < n; j++) {
+        const v = get(i, j);
+        if (v === cor) { seguidos++; if (seguidos === 5) p += 3; else if (seguidos > 5) p++; }
+        else { cor = v; seguidos = 1; }
+      }
+    }
+  };
+  linhaP((i, j) => m[i][j]);
+  linhaP((i, j) => m[j][i]);
+  for (let i = 0; i < n - 1; i++) for (let j = 0; j < n - 1; j++) {
+    const v = m[i][j];
+    if (v === m[i][j + 1] && v === m[i + 1][j] && v === m[i + 1][j + 1]) p += 3;
+  }
+  const alvo = [1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0];
+  const procura = (get) => {
+    for (let i = 0; i < n; i++) for (let j = 0; j + 11 <= n; j++) {
+      let bate = true;
+      for (let k = 0; k < 11; k++) if (get(i, j + k) !== alvo[k]) { bate = false; break; }
+      if (bate) p += 40;
+      bate = true;
+      for (let k = 0; k < 11; k++) if (get(i, j + k) !== alvo[10 - k]) { bate = false; break; }
+      if (bate) p += 40;
+    }
+  };
+  procura((i, j) => m[i][j]);
+  procura((i, j) => m[j][i]);
+  let escuros = 0;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) escuros += m[i][j];
+  p += Math.floor(Math.abs((escuros * 100) / (n * n) - 50) / 5) * 10;
+  return p;
+}
+
+function bitsFormato(mascara) {
+  let dados = (0b01 << 3) | mascara;      // nível L = 01
+  let v = dados << 10;
+  for (let i = 4; i >= 0; i--) if (v & (1 << (i + 10))) v ^= 0x537 << i;
+  return ((dados << 10) | v) ^ 0x5412;
+}
+
+function porFormato(m, n, mascara) {
+  const f = bitsFormato(mascara) & 0x7fff;
+  const bit = (k) => (f >> (14 - k)) & 1;   // k = 0 é o bit mais significativo
+
+  // primeira cópia, junto ao localizador superior esquerdo
+  const copia1 = [[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  copia1.forEach(([i, j], k) => { m[i][j] = bit(k); });
+
+  // segunda cópia, repartida pelos outros dois cantos
+  const copia2 = [];
+  for (let i = 1; i <= 7; i++) copia2.push([n - i, 8]);
+  for (let c = n - 8; c <= n - 1; c++) copia2.push([8, c]);
+  copia2.forEach(([i, j], k) => { m[i][j] = bit(k); });
+}
+
+function gerarQR(texto) {
+  const { versao, saida } = codewords(texto);
+  const n = versao * 4 + 17;
+  const base = novaMatriz(n);
+  padroes(base, versao);
+  reservarFormato(base);
+  const reservado = base.m.map((l) => l.map((v) => v !== null));
+  colocarDados(base, saida);
+
+  let melhor = null, melhorP = Infinity;
+  for (let k = 0; k < 8; k++) {
+    const m = base.m.map((l) => l.slice());
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      if (!reservado[i][j] && MASCARAS[k](i, j)) m[i][j] ^= 1;
+    }
+    porFormato(m, n, k);
+    const p = penalidade(m, n);
+    if (p < melhorP) { melhorP = p; melhor = m; }
+  }
+  return { matriz: melhor, tamanho: n, versao };
+}
+
+/* desenha o código como SVG, escalável e sem imagens */
+function desenharQR(texto, alvo) {
+  try {
+    const { matriz, tamanho } = gerarQR(texto);
+    const partes = [];
+    for (let i = 0; i < tamanho; i++) {
+      for (let j = 0; j < tamanho; j++) {
+        if (matriz[i][j]) partes.push(`M${j} ${i}h1v1h-1z`);
+      }
+    }
+    alvo.innerHTML =
+      `<svg viewBox="0 0 ${tamanho} ${tamanho}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">` +
+      `<path d="${partes.join("")}" fill="#0b1120"/></svg>`;
+    alvo.classList.remove("oculto");
+  } catch (e) {
+    alvo.classList.add("oculto");
+  }
+}
 
 /* ---------- Convite ---------- */
 
