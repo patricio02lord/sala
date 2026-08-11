@@ -716,3 +716,23 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 /* última hora: a linha respira devagar, sem alarmes */
 .vida.fim span { animation: expira 2.8s ease-in-out infinite; }
 @keyframes expira { 50% { opacity: 0.45; } }
+
+
+/* ------------------------------------------------------------------ *
+ * Convite por QR
+ * ------------------------------------------------------------------ */
+
+.qr-caixa {
+  display: flex; flex-direction: column; align-items: center;
+  margin: 0 0 20px;
+}
+.qr {
+  width: 168px; height: 168px; padding: 12px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  animation: qrEntra 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes qrEntra { from { opacity: 0; transform: scale(0.94); } }
+.qr svg { display: block; width: 100%; height: 100%; }
+.qr-nota { font-size: 11.5px; color: var(--texto-3); margin: 12px 0 0; letter-spacing: 0; }
