@@ -229,16 +229,12 @@ app.post("/api/salas", async (req, res) => {
       typeof req.body?.anfitriao === "string" && req.body.anfitriao.length <= 800
         ? req.body.anfitriao
         : "";
-    // Só a indicação de que existe palavra e o sal usado para a derivar.
-    // A palavra em si nunca chega aqui.
-    const comPalavra = req.body?.comPalavra === true;
-    const sal = typeof req.body?.sal === "string" && req.body.sal.length <= 64 ? req.body.sal : "";
 
     const code = await gerarCodigo();
     const expiraEm = Date.now() + ttlMin * 60_000;
     await armazem.criar(
       code,
-      { code, criadaEm: Date.now(), expiraEm, anfitriao, limite, comPalavra, sal },
+      { code, criadaEm: Date.now(), expiraEm, anfitriao, limite },
       segundosAte(expiraEm)
     );
     res.json({ code, criadaEm: Date.now(), expiraEm });
@@ -252,7 +248,7 @@ app.get("/api/salas/:code", async (req, res) => {
   try {
     const s = await salaViva(req.params.code.toUpperCase());
     if (!s) return res.status(404).json({ erro: "Esta conversa não existe ou já terminou." });
-    res.json({ code: s.code, criadaEm: s.criadaEm, expiraEm: s.expiraEm, anfitriao: s.anfitriao, comPalavra: !!s.comPalavra, sal: s.sal || "" });
+    res.json({ code: s.code, criadaEm: s.criadaEm, expiraEm: s.expiraEm, anfitriao: s.anfitriao });
   } catch (e) {
     console.error("ler sala:", e.message);
     res.status(500).json({ erro: "Não foi possível confirmar a conversa." });
