@@ -204,6 +204,7 @@ document.addEventListener("visibilitychange", () => {
   const s = vivas.get(activa);
   if (s?.novas) { s.novas = 0; desenharLista(); }
   actualizarAba();
+  avisarQueVi(activa);
 });
 
 function desenharVida() {
@@ -355,7 +356,7 @@ function entrarNaConversa(code) {
     s.iniciada = true;
     s.msgs = [];
     for (const m of r.historico) await receber(code, m, true);
-    if (code === activa) desenharConversa();
+    if (code === activa) { desenharConversa(); avisarQueVi(code); }
     if (!jaTinha) {
       try { socket.emit("mensagem", { code, ct: await cifrar({ n: nome, tipo: "entrada" }, s.chave) }); } catch {}
     }
@@ -367,6 +368,14 @@ async function receber(code, msg, doHistorico) {
   if (!s) return;
   let claro = null;
   try { claro = await decifrar(msg.ct, s.chave); } catch {}
+
+  if (claro?.tipo === "vista") {
+    if (claro.n !== nome) {
+      s.visto = Math.max(s.visto || 0, Number(claro.ate) || 0);
+      if (code === activa) marcarVistas(s);
+    }
+    return;
+  }
 
   const item = {
     id: msg.id, t: msg.t,
@@ -389,6 +398,7 @@ async function receber(code, msg, doHistorico) {
   if (code === activa) {
     pintar(item, s);
     if (nova) {
+      avisarQueVi(code);
       som.recebida();
       if (abaEscondida()) { s.novas = (s.novas || 0) + 1; actualizarAba(); }
     }
@@ -398,6 +408,32 @@ async function receber(code, msg, doHistorico) {
     desenharLista();
     actualizarAba();
   }
+}
+
+/* ---------- Confirmação de leitura ---------- */
+/* Vai cifrada como qualquer mensagem: o servidor não sabe quem leu o quê. */
+
+async function avisarQueVi(code) {
+  const s = vivas.get(code);
+  if (!s || !socket?.connected || abaEscondida()) return;
+  const ultima = [...s.msgs].reverse().find((m) => m.autor !== nome && m.tipo !== "entrada");
+  if (!ultima || (s.avisado || 0) >= ultima.t) return;
+  s.avisado = ultima.t;
+  try {
+    socket.emit("mensagem", { code, ct: await cifrar({ n: nome, tipo: "vista", ate: ultima.t }, s.chave) });
+  } catch {}
+}
+
+function marcarVistas(s) {
+  const ate = s.visto || 0;
+  let ultimaVista = null;
+  document.querySelectorAll("#mensagens .msg.minha").forEach((el) => {
+    const visto = Number(el.dataset.t) <= ate;
+    el.classList.toggle("vista", visto);
+    el.classList.remove("ultima-vista");
+    if (visto) ultimaVista = el;
+  });
+  if (ultimaVista) ultimaVista.classList.add("ultima-vista");
 }
 
 /* ---------- Desenhar a conversa ---------- */
@@ -443,8 +479,20 @@ function pintar(item, s) {
   const h = document.createElement("span");
   h.className = "hora";
   h.textContent = horas(item.t);
+  if (minha) {
+    const v = document.createElement("span");
+    v.className = "visto-marca";
+    v.setAttribute("aria-label", "Vista");
+    v.innerHTML =
+      '<svg viewBox="0 0 16 11" width="13" height="9" aria-hidden="true">' +
+      '<path d="M1 6l3.2 3.2L9.5 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M6.4 6.9l1.3 1.3L13 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+      "</svg>";
+    h.append(v);
+  }
   balao.append(p, h);
   div.append(balao);
+  div.dataset.t = item.t;
 
   $("mensagens").append(div);
   ultimoAutor = item.autor;
@@ -458,6 +506,7 @@ function desenharConversa() {
   $("mensagens").textContent = "";
   ultimoAutor = null; ultimoElemento = null;
   for (const m of s.msgs) pintar(m, s);
+  marcarVistas(s);
   $("fim").scrollIntoView({ block: "end" });
 }
 
@@ -503,6 +552,7 @@ async function abrirConversa(code) {
   actualizarSub();
   desenharVida();
   desenharConversa();
+  avisarQueVi(code);
   desenharLista();
   if (chamada.estado !== "parado" && chamada.code === code) ecraChamada(chamada.estado, $("chamada-estado").textContent);
   else if (chamada.code !== code) $("chamada").classList.add("oculto");
