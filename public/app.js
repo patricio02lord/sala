@@ -87,43 +87,6 @@ async function decifrar(texto, chave) {
   return JSON.parse(new TextDecoder().decode(claro));
 }
 
-/* A chave da conversa pode ser reforçada com uma palavra combinada.
-   A chave final sai de: chave do link + palavra, misturadas com PBKDF2.
-   Sem a palavra certa, a decifração falha — não há verificação a contornar. */
-
-const ITERACOES = 210000;
-
-async function derivarComPalavra(bytesLink, palavra, sal) {
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new Uint8Array([...bytesLink, ...new TextEncoder().encode(palavra)]),
-    "PBKDF2", false, ["deriveKey"]
-  );
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: b64u.de(sal), iterations: ITERACOES, hash: "SHA-256" },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false, ["encrypt", "decrypt"]
-  );
-}
-
-/* Confirma se a palavra abre mesmo esta conversa. */
-async function chaveComPalavra(k, palavra, sal, provaCifrada) {
-  const chave = await derivarComPalavra(b64u.de(k), palavra.trim().toLowerCase(), sal);
-  try {
-    const prova = await decifrar(provaCifrada, chave);
-    return prova?.ok === true ? chave : null;
-  } catch {
-    return null;
-  }
-}
-
-/* Reconstrói a chave de uma conversa guardada, com ou sem palavra. */
-async function chaveDaConversa(g) {
-  if (g.palavra) return derivarComPalavra(b64u.de(g.k), g.palavra, g.sal);
-  return importarChave(g.k);
-}
-
 /* ---------- Arquivo local ---------- */
 
 const CHAVE_ARQ = "sala:minhas";
@@ -688,7 +651,7 @@ async function abrirConversa(code) {
     if (g) {
       try {
         vivas.set(code, {
-          chave: await chaveDaConversa(g), k: g.k, sal: g.sal, para: g.para || "",
+          chave: await importarChave(g.k), k: g.k, para: g.para || "",
           criada: g.criada, expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
         });
         entrarNaConversa(code);
@@ -769,36 +732,22 @@ document.querySelectorAll(".opcao").forEach((b) =>
 async function criarSala() {
   const n = ($("nome-criar").value.trim() || lerNome()).trim();
   if (!n) return erro("e-criar", "Escreve o teu nome primeiro.");
-  const palavra = $("palavra-criar").value.trim();
-  if (palavra && palavra.length < 3) return erro("e-criar", "A palavra precisa de pelo menos 3 letras.");
   $("b-criar").disabled = true;
   $("b-criar").textContent = "A gerar…";
   try {
     nome = n; guardarNome(n);
-    const base = await gerarChave();
-    const k = await exportarChave(base);
-
-    let chave = base, sal = "", prova = "";
-    if (palavra) {
-      sal = b64u.para(crypto.getRandomValues(new Uint8Array(16)));
-      chave = await derivarComPalavra(b64u.de(k), palavra.toLowerCase(), sal);
-      prova = await cifrar({ ok: true }, chave);
-    }
+    const chave = await gerarChave();
+    const k = await exportarChave(chave);
     const r = await fetch("/api/salas", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-dono": lerChaveDono() },
-      body: JSON.stringify({
-        ttl, limite: 2,
-        comPalavra: Boolean(palavra), sal,
-        anfitriao: await cifrar({ nome: n, prova }, chave),
-      }),
+      body: JSON.stringify({ ttl, limite: 2, anfitriao: await cifrar({ nome: n }, chave) }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
 
-    vivas.set(d.code, { chave, k, sal, para: "", criada: d.criadaEm, expira: d.expiraEm, msgs: [], novas: 0, dono: true });
-    guardarSala({ code: d.code, k, sal, palavra: palavra ? palavra.toLowerCase() : "", para: "", criada: d.criadaEm, expira: d.expiraEm, dono: true });
-    $("aviso-palavra").classList.toggle("oculto", !palavra);
+    vivas.set(d.code, { chave, k, para: "", criada: d.criadaEm, expira: d.expiraEm, msgs: [], novas: 0, dono: true });
+    guardarSala({ code: d.code, k, para: "", criada: d.criadaEm, expira: d.expiraEm, dono: true });
     entrarNaConversa(d.code);
 
     convite = d.code;
@@ -806,7 +755,6 @@ async function criarSala() {
     $("link-sala").textContent = linkDe(d.code);
     desenharQR(linkDe(d.code), $("qr"));
     erro("e-criar", "");
-    $("palavra-criar").value = "";
     mostrar("v-convite");
   } catch (e) {
     erro("e-criar", e.message || "Não foi possível criar a conversa.");
@@ -817,8 +765,7 @@ async function criarSala() {
 }
 
 escutar("b-criar", "click", criarSala);
-escutar("nome-criar", "keydown", (e) => e.key === "Enter" && $("palavra-criar").focus());
-escutar("palavra-criar", "keydown", (e) => e.key === "Enter" && criarSala());
+escutar("nome-criar", "keydown", (e) => e.key === "Enter" && criarSala());
 
 /* ---------- Código QR ---------- */
 /* Gerado aqui dentro, de propósito: o link contém a chave de decifração
@@ -1110,33 +1057,25 @@ async function prepararEntrada() {
     return;
   }
 
+  let chave;
+  try { chave = await importarChave(k); } catch {
+    $("titulo-entrada").textContent = "Chave inválida";
+    $("info-entrada").textContent = "Este link está danificado.";
+    return;
+  }
+
   try {
     const r = await fetch(`/api/salas/${code}`);
     const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
+    let dono = "";
+    if (d.anfitriao) { try { dono = (await decifrar(d.anfitriao, chave)).nome || ""; } catch {} }
 
-    let chave = null, dono = "";
-    if (!d.comPalavra) {
-      try { chave = await importarChave(k); } catch {
-        $("titulo-entrada").textContent = "Chave inválida";
-        $("info-entrada").textContent = "Este link está danificado.";
-        return;
-      }
-      if (d.anfitriao) { try { dono = (await decifrar(d.anfitriao, chave)).nome || ""; } catch {} }
-    }
-
-    convite = { code, k, chave, sal: d.sal, comPalavra: d.comPalavra, anfitriao: d.anfitriao,
-                criada: d.criadaEm, expira: d.expiraEm, dono };
-
-    $("campo-palavra").classList.toggle("oculto", !d.comPalavra);
+    convite = { code, k, chave, criada: d.criadaEm, expira: d.expiraEm, dono };
     $("avatar-anfitriao").textContent = inicial(dono || code);
     $("avatar-anfitriao").style.background = corDe(dono || code);
-    $("titulo-entrada").textContent = dono
-      ? `Bem-vindo à conversa do ${dono}`
-      : d.comPalavra ? "Conversa protegida" : `Conversa ${code}`;
-    $("info-entrada").textContent = d.comPalavra
-      ? `Esta conversa pede uma palavra combinada. Sem ela, o conteúdo é ilegível.`
-      : `Desaparece daqui a ${restante(d.expiraEm)}. Escreve o teu nome para entrar.`;
+    $("titulo-entrada").textContent = dono ? `Bem-vindo à conversa do ${dono}` : `Conversa ${code}`;
+    $("info-entrada").textContent = `Desaparece daqui a ${restante(d.expiraEm)}. Escreve o teu nome para entrar.`;
     $("nome-entrada").value = lerNome();
     $("form-entrada").classList.remove("oculto");
   } catch (e) {
@@ -1145,52 +1084,22 @@ async function prepararEntrada() {
   }
 }
 
-async function entrarPorConvite() {
+function entrarPorConvite() {
   const n = $("nome-entrada").value.trim();
   if (!n) return erro("e-entrada", "Escreve o teu nome para continuar.");
   if (!convite?.code) return;
-
-  let { code, k, chave, sal, comPalavra, anfitriao: cifradoDono, criada, expira, dono } = convite;
-  let palavra = "";
-
-  if (comPalavra) {
-    palavra = $("palavra-entrada").value.trim().toLowerCase();
-    if (!palavra) return erro("e-entrada", "Escreve a palavra combinada.");
-    $("b-entrar").disabled = true;
-    $("b-entrar").textContent = "A verificar…";
-    try {
-      let claro = null;
-      const tentativa = await derivarComPalavra(b64u.de(k), palavra, sal);
-      try { claro = await decifrar(cifradoDono, tentativa); } catch {}
-      if (!claro) {
-        erro("e-entrada", "Palavra errada.");
-        return;
-      }
-      chave = tentativa;
-      dono = claro.nome || "";
-      convite.chave = chave;
-    } finally {
-      $("b-entrar").disabled = false;
-      $("b-entrar").textContent = "Entrar";
-    }
-  }
-
   nome = n; guardarNome(n); erro("e-entrada", "");
 
-  vivas.set(code, { chave, k, sal, para: dono, criada, expira, msgs: [], novas: 0, dono: false });
-  guardarSala({ code, k, sal, palavra, para: dono, criada, expira, dono: false });
+  const { code, k, chave, criada, expira, dono } = convite;
+  vivas.set(code, { chave, k, para: dono, criada, expira, msgs: [], novas: 0, dono: false });
+  guardarSala({ code, k, para: dono, criada, expira, dono: false });
   entrarNaConversa(code);
   modoConvidado();
   abrirConversa(code);
 }
 
 escutar("b-entrar", "click", entrarPorConvite);
-escutar("nome-entrada", "keydown", (e) => {
-  if (e.key !== "Enter") return;
-  if (convite?.comPalavra) $("palavra-entrada").focus();
-  else entrarPorConvite();
-});
-escutar("palavra-entrada", "keydown", (e) => e.key === "Enter" && entrarPorConvite());
+escutar("nome-entrada", "keydown", (e) => e.key === "Enter" && entrarPorConvite());
 
 /* ---------- Chamada (WebRTC ponto a ponto) ---------- */
 /* O audio vai directamente de um browser para o outro. A sinalizacao passa pelo
@@ -1484,7 +1393,7 @@ async function restaurar() {
   for (const g of guardadas) {
     try {
       vivas.set(g.code, {
-        chave: await chaveDaConversa(g), k: g.k, sal: g.sal, para: g.para || "",
+        chave: await importarChave(g.k), k: g.k, para: g.para || "",
         criada: g.criada, expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
       });
     } catch {}
