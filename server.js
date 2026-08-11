@@ -213,7 +213,7 @@ app.post("/api/salas", async (req, res) => {
       { code, criadaEm: Date.now(), expiraEm, anfitriao, limite },
       segundosAte(expiraEm)
     );
-    res.json({ code, expiraEm });
+    res.json({ code, criadaEm: Date.now(), expiraEm });
   } catch (e) {
     console.error("criar sala:", e.message);
     res.status(500).json({ erro: "Não foi possível criar a conversa." });
@@ -224,7 +224,7 @@ app.get("/api/salas/:code", async (req, res) => {
   try {
     const s = await salaViva(req.params.code.toUpperCase());
     if (!s) return res.status(404).json({ erro: "Esta conversa não existe ou já terminou." });
-    res.json({ code: s.code, expiraEm: s.expiraEm, anfitriao: s.anfitriao });
+    res.json({ code: s.code, criadaEm: s.criadaEm, expiraEm: s.expiraEm, anfitriao: s.anfitriao });
   } catch (e) {
     console.error("ler sala:", e.message);
     res.status(500).json({ erro: "Não foi possível confirmar a conversa." });
@@ -250,7 +250,7 @@ io.on("connection", (socket) => {
       if (!s) return ack?.({ ok: false, code: c, erro: "Esta conversa não existe ou já terminou." });
 
       const historico = await armazem.historico(c);
-      if (minhas.has(c)) return ack?.({ ok: true, code: c, expiraEm: s.expiraEm, historico });
+      if (minhas.has(c)) return ack?.({ ok: true, code: c, criadaEm: s.criadaEm, expiraEm: s.expiraEm, historico });
       if (minhas.size >= 30) return ack?.({ ok: false, code: c, erro: "Conversas a mais nesta ligação." });
       if (contar(c) >= (s.limite || MAX_PESSOAS)) {
         return ack?.({ ok: false, code: c, erro: "Esta conversa já está ocupada." });
@@ -258,7 +258,7 @@ io.on("connection", (socket) => {
 
       minhas.add(c);
       await socket.join(c);
-      ack?.({ ok: true, code: c, expiraEm: s.expiraEm, historico });
+      ack?.({ ok: true, code: c, criadaEm: s.criadaEm, expiraEm: s.expiraEm, historico });
       io.to(c).emit("presenca", { code: c, n: contar(c) });
     } catch (e) {
       console.error("entrar:", e.message);
