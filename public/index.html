@@ -101,6 +101,17 @@
       </section>
 
       <footer>
+        <div id="resposta" class="resposta oculto">
+          <span class="resposta-fio" aria-hidden="true"></span>
+          <div class="resposta-corpo">
+            <span id="resp-autor" class="resposta-autor"></span>
+            <span id="resp-texto" class="resposta-texto"></span>
+          </div>
+          <button id="resp-fechar" class="resposta-fechar" aria-label="Cancelar resposta">
+            <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
+          </button>
+        </div>
+
         <div class="barra">
           <textarea id="texto" rows="1" placeholder="Escrever mensagem" enterkeyhint="send"></textarea>
           <button id="b-enviar" class="enviar" aria-label="Enviar">
