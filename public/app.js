@@ -320,6 +320,7 @@ function garantirSocket() {
     try {
       const claro = await decifrar(ct, s.chave);
       item.txt = String(claro.txt || "");
+      item.resp = claro.resp || null;
       item.ilegivel = false;
     } catch { item.ilegivel = true; }
     item.editada = editada;
@@ -409,6 +410,7 @@ async function receber(code, msg, doHistorico) {
     ilegivel: !claro,
     editada: msg.editada || 0,
     apagada: msg.apagada || 0,
+    resp: claro?.resp || null,
   };
   s.msgs.push(item);
   if (s.msgs.length > 300) s.msgs.shift();
@@ -462,6 +464,41 @@ function marcarVistas(s) {
   if (ultimaVista) ultimaVista.classList.add("ultima-vista");
 }
 
+/* ---------- Responder a uma mensagem ---------- */
+/* A citação viaja cifrada dentro da própria mensagem: o servidor não a vê. */
+
+let aResponder = null;   // { id, autor, txt }
+
+function comecarResposta(item) {
+  if (item.apagada) return;
+  aResponder = {
+    id: item.id,
+    autor: item.autor,
+    txt: (item.txt || "").slice(0, 140),
+  };
+  $("resp-autor").textContent = item.autor === nome ? "Tu" : item.autor;
+  $("resp-texto").textContent = aResponder.txt;
+  $("resposta").classList.remove("oculto");
+  $("texto").focus();
+}
+
+function cancelarResposta() {
+  aResponder = null;
+  $("resposta").classList.add("oculto");
+}
+
+function irParaMensagem(id) {
+  const alvo = document.querySelector(`#mensagens .msg[data-id="${CSS.escape(id)}"]`);
+  if (!alvo) return;
+  alvo.scrollIntoView({ behavior: "smooth", block: "center" });
+  alvo.classList.remove("realce");
+  void alvo.offsetWidth;
+  alvo.classList.add("realce");
+  setTimeout(() => alvo.classList.remove("realce"), 1600);
+}
+
+escutar("resp-fechar", "click", cancelarResposta);
+
 /* ---------- Editar e apagar (janela de 20 minutos) ---------- */
 /* O servidor impõe o mesmo limite: esconder o botão não chegaria. */
 
@@ -494,7 +531,8 @@ function abrirAcoes(div, item) {
 
 function comecarEdicao(item) {
   if (!podeMexer(item)) return avisar("Já passaram os 20 minutos");
-  aEditar = { code: activa, id: item.id };
+  cancelarResposta();
+  aEditar = { code: activa, id: item.id, resp: item.resp || null };
   $("texto").value = item.txt;
   $("texto").focus();
   $("texto").style.height = "auto";
@@ -516,8 +554,10 @@ async function guardarEdicao() {
   if (!txt) { cancelarEdicao(); return; }
   const alvo = aEditar;
   cancelarEdicao();
+  const corpo = { n: nome, txt };
+  if (alvo.resp) corpo.resp = alvo.resp;
   try {
-    socket.emit("alterar", { code: alvo.code, id: alvo.id, ct: await cifrar({ n: nome, txt }, s.chave) },
+    socket.emit("alterar", { code: alvo.code, id: alvo.id, ct: await cifrar(corpo, s.chave) },
       (r) => { if (!r?.ok) avisar(r?.erro || "Não foi possível editar."); });
   } catch { avisar("Não foi possível editar."); }
 }
@@ -570,6 +610,20 @@ function pintar(item, s) {
     a.textContent = item.autor;
     balao.append(a);
   }
+  if (item.resp && !item.apagada) {
+    const cit = document.createElement("button");
+    cit.className = "citacao";
+    const quem = document.createElement("span");
+    quem.className = "citacao-autor";
+    quem.textContent = item.resp.autor === nome ? "Tu" : item.resp.autor;
+    const txt = document.createElement("span");
+    txt.className = "citacao-texto";
+    txt.textContent = item.resp.txt;
+    cit.append(quem, txt);
+    cit.addEventListener("click", (e) => { e.stopPropagation(); irParaMensagem(item.resp.id); });
+    balao.append(cit);
+  }
+
   const p = document.createElement("p");
   p.className = "corpo";
   p.textContent = item.apagada
@@ -600,6 +654,15 @@ function pintar(item, s) {
   balao.append(p, h);
   div.append(balao);
   div.dataset.t = item.t;
+
+  if (!item.apagada) {
+    const br = document.createElement("button");
+    br.className = "responder";
+    br.setAttribute("aria-label", "Responder");
+    br.innerHTML = '<svg viewBox="0 0 16 16" width="14" height="14"><path d="M7 4L3 8l4 4M3.4 8H10a3 3 0 013 3v1.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    br.addEventListener("click", (e) => { e.stopPropagation(); comecarResposta(item); });
+    div.append(br);
+  }
 
   if (minha && !item.apagada) {
     const b = document.createElement("button");
@@ -661,6 +724,7 @@ async function abrirConversa(code) {
   const s = vivas.get(code);
   if (!s) { avisar("Não foi possível abrir esta conversa"); mostrarAlgo(); return; }
   if (aEditar && aEditar.code !== code) cancelarEdicao();
+  if (activa !== code) cancelarResposta();
   activa = code;
   s.novas = 0;
   actualizarAba();
@@ -699,8 +763,11 @@ async function enviar() {
   $("texto").value = "";
   $("texto").style.height = "auto";
   som.enviada();
+  const corpo = { n: nome, txt };
+  if (aResponder) corpo.resp = aResponder;
+  cancelarResposta();
   try {
-    socket.emit("mensagem", { code: activa, ct: await cifrar({ n: nome, txt }, s.chave) },
+    socket.emit("mensagem", { code: activa, ct: await cifrar(corpo, s.chave) },
       (r) => erro("e-sala", r?.ok ? "" : r?.erro));
   } catch {
     erro("e-sala", "Não foi possível enviar.");
@@ -710,6 +777,7 @@ async function enviar() {
 escutar("b-enviar", "click", enviar);
 escutar("texto", "keydown", (e) => {
   if (e.key === "Escape" && aEditar) { e.preventDefault(); cancelarEdicao(); return; }
+  if (e.key === "Escape" && aResponder) { e.preventDefault(); cancelarResposta(); return; }
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
 });
 escutar("texto", "input", (e) => {
