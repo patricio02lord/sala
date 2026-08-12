@@ -478,13 +478,14 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 
 /* balões */
 
-.msg { display: flex; margin-bottom: 2px; animation: msgEntra 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.msg { display: flex; align-items: center; margin-bottom: 2px; animation: msgEntra 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
 @keyframes msgEntra { from { opacity: 0; transform: translateY(6px) scale(0.985); } }
 .msg.fim-grupo { margin-bottom: 14px; }
 .msg.minha { justify-content: flex-end; }
 
 .balao {
   max-width: 72%;
+  min-width: 0;
   padding: 9px 13px 8px;
   border-radius: var(--r-gra);
   background: var(--nivel-2);
@@ -643,11 +644,23 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   .icone { width: 40px; height: 40px; }
   .so-ecra-largo { display: none !important; }
   .sala header { gap: 8px; padding: 0 10px; }
-  .responder, .abrir-acoes { width: 36px; height: 36px; opacity: 1; }
-  .responder svg, .abrir-acoes svg { width: 16px; height: 16px; }
-  .balao { max-width: 74%; }
-  .acoes-msg { right: 40px; min-width: 140px; }
-  .acoes-msg button { padding: 11px 12px; font-size: 14px; }
+  .balao { max-width: 78%; }
+
+  /* no telemóvel as opções abrem por toque longo, para não roubar largura */
+  .responder, .abrir-acoes { display: none; }
+
+  .acoes-msg {
+    position: fixed; left: 12px; right: 12px; bottom: 0; top: auto;
+    transform: none; min-width: 0;
+    flex-direction: column;
+    padding: 6px; border-radius: 16px;
+    margin-bottom: calc(12px + env(safe-area-inset-bottom));
+    animation: subirFolha 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .acoes-msg button { padding: 14px 14px; font-size: 15px; border-radius: 11px; }
+  @keyframes subirFolha { from { opacity: 0; transform: translateY(14px); } }
+
+  .msg.a-tocar .balao { box-shadow: 0 0 0 2px var(--acento-luz); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -778,7 +791,7 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
  * Editar e apagar mensagens
  * ------------------------------------------------------------------ */
 
-.msg { position: relative; }
+.msg { position: relative; max-width: 100%; }
 
 .abrir-acoes {
   display: flex; align-items: center; justify-content: center;
