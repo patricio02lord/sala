@@ -509,24 +509,34 @@ const podeMexer = (item) => !item.apagada && Date.now() - item.t <= JANELA_EDICA
 
 function fecharAcoes() {
   document.querySelectorAll(".acoes-msg").forEach((el) => el.remove());
+  document.querySelectorAll(".msg.a-tocar").forEach((el) => el.classList.remove("a-tocar"));
 }
 
-function abrirAcoes(div, item) {
+function abrirAcoes(div, item, completo) {
   fecharAcoes();
   const cx = document.createElement("div");
   cx.className = "acoes-msg";
 
-  const bEd = document.createElement("button");
-  bEd.textContent = "Editar";
-  bEd.addEventListener("click", (e) => { e.stopPropagation(); fecharAcoes(); comecarEdicao(item); });
+  const opcao = (texto, classe, accao) => {
+    const b = document.createElement("button");
+    b.textContent = texto;
+    if (classe) b.className = classe;
+    b.addEventListener("click", (e) => { e.stopPropagation(); fecharAcoes(); accao(); });
+    return b;
+  };
 
-  const bAp = document.createElement("button");
-  bAp.textContent = "Apagar";
-  bAp.className = "perigo";
-  bAp.addEventListener("click", (e) => { e.stopPropagation(); fecharAcoes(); apagarMensagem(item); });
+  const minha = item.autor === nome && !item.ilegivel;
+  if (completo) cx.append(opcao("Responder", "", () => comecarResposta(item)));
+  if (minha && podeMexer(item)) {
+    cx.append(opcao("Editar", "", () => comecarEdicao(item)));
+    cx.append(opcao("Apagar", "perigo", () => apagarMensagem(item)));
+  }
+  if (completo) cx.append(opcao("Cancelar", "", () => {}));
+  if (!cx.children.length) return;
 
-  cx.append(bEd, bAp);
   div.append(cx);
+  div.classList.add("a-tocar");
+  setTimeout(() => div.classList.remove("a-tocar"), 2500);
 }
 
 function comecarEdicao(item) {
@@ -656,6 +666,25 @@ function pintar(item, s) {
   div.dataset.t = item.t;
 
   if (!item.apagada) {
+    let temporizador = null, moveu = false;
+    const cancelar = () => { clearTimeout(temporizador); temporizador = null; };
+    div.addEventListener("touchstart", () => {
+      moveu = false;
+      temporizador = setTimeout(() => {
+        if (moveu) return;
+        podeVibrar(14);
+        abrirAcoes(div, item, true);
+      }, 480);
+    }, { passive: true });
+    div.addEventListener("touchmove", () => { moveu = true; cancelar(); }, { passive: true });
+    div.addEventListener("touchend", cancelar);
+    div.addEventListener("touchcancel", cancelar);
+    div.addEventListener("contextmenu", (e) => {
+      if (window.matchMedia("(pointer: coarse)").matches) e.preventDefault();
+    });
+  }
+
+  if (!item.apagada) {
     const br = document.createElement("button");
     br.className = "responder";
     br.setAttribute("aria-label", "Responder");
@@ -672,7 +701,7 @@ function pintar(item, s) {
     b.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!podeMexer(item)) return avisar("Já passaram os 20 minutos");
-      abrirAcoes(div, item);
+      abrirAcoes(div, item, false);
     });
     div.append(b);
   }
