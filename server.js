@@ -369,6 +369,15 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Sinal de "está a escrever": efémero, não é guardado em lado nenhum.
+  socket.on("escrevendo", ({ code, ct } = {}) => {
+    const c = String(code || "").toUpperCase();
+    if (!minhas.has(c)) return;
+    if (typeof ct !== "string" || !ct || ct.length > 2000) return;
+    if (!limitar(sinais, "self", SINAIS_POR_LIGACAO)) return;
+    socket.to(c).emit("escrevendo", { code: c, ct });
+  });
+
   // Sinalização das chamadas: cifrada, o servidor apenas reencaminha.
   socket.on("sinal", ({ code, ct } = {}) => {
     const c = String(code || "").toUpperCase();
