@@ -255,6 +255,7 @@ app.get("/api/salas/:code", async (req, res) => {
   }
 });
 
+app.get("/sobre", (_req, res) => res.sendFile(join(__dirname, "public", "sobre.html")));
 app.get("/s/:code", (_req, res) => res.sendFile(join(__dirname, "public", "index.html")));
 
 const http = createServer(app);
