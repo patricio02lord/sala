@@ -335,14 +335,17 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   background: linear-gradient(90deg, var(--linha), transparent);
 }
 
-.palco { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.palco { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .palco-nada {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 4px;
-  text-align: center; color: var(--texto-3); font-size: 14px; padding: 32px;
+  align-items: center; justify-content: center; gap: 0;
+  text-align: center; padding: 32px;
+  max-width: 380px; margin: 0 auto;
 }
-.palco-nada p { margin: 0; }
+.palco-nada p {
+  font-size: 13.5px; line-height: 1.65; color: var(--texto-3); margin: 0;
+}
 .palco-nada .marca-icone.grande { opacity: 0.35; }
 
 /* itens da lista */
@@ -478,7 +481,11 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 
 /* balões */
 
-.msg { display: flex; align-items: center; margin-bottom: 2px; animation: msgEntra 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.msg {
+  position: relative; max-width: 100%;
+  display: flex; align-items: center; margin-bottom: 2px;
+  animation: msgEntra 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @keyframes msgEntra { from { opacity: 0; transform: translateY(6px) scale(0.985); } }
 .msg.fim-grupo { margin-bottom: 14px; }
 .msg.minha { justify-content: flex-end; }
@@ -510,8 +517,8 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 }
 .msg.minha .corpo { color: #ffffff; }
 .hora {
-  display: block; text-align: right; font-size: 10.5px;
-  color: var(--texto-3); margin-top: 2px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 4px;
+  font-size: 10.5px; color: var(--texto-3); margin-top: 2px;
   font-variant-numeric: tabular-nums;
 }
 .msg.minha .hora { color: rgba(255, 255, 255, 0.55); }
@@ -622,7 +629,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 .app.convidado .item-acao { display: none; }
 
 .so-telemovel { display: none !important; }
-.so-ecra-largo { display: inline-flex; }
 
 @media (max-width: 860px) {
   .painel { width: 100%; border-right: none; }
@@ -663,9 +669,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   .msg.a-tocar .balao { box-shadow: 0 0 0 2px var(--acento-luz); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-}
 
 
 /* ------------------------------------------------------------------ *
@@ -700,7 +703,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
  * Estado vazio
  * ------------------------------------------------------------------ */
 
-.palco-nada { gap: 0; max-width: 380px; margin: 0 auto; }
 .nada-selo {
   color: var(--acento-luz); opacity: 0.5; margin-bottom: 22px;
   animation: flutua 7s ease-in-out infinite;
@@ -711,8 +713,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   font-size: 16px; font-weight: 550; color: var(--texto);
   margin: 0 0 7px; letter-spacing: -0.015em;
 }
-.palco-nada p { font-size: 13.5px; line-height: 1.65; color: var(--texto-3); margin: 0; }
-
 .nada-lista {
   list-style: none; margin: 26px 0 0; padding: 16px 0 0;
   border-top: 1px solid var(--linha);
@@ -775,8 +775,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
  * Confirmação de leitura
  * ------------------------------------------------------------------ */
 
-.hora { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
-
 .visto-marca {
   display: inline-flex; align-items: center;
   opacity: 0; transform: translateX(-2px);
@@ -790,8 +788,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 /* ------------------------------------------------------------------ *
  * Editar e apagar mensagens
  * ------------------------------------------------------------------ */
-
-.msg { position: relative; max-width: 100%; }
 
 .abrir-acoes {
   display: flex; align-items: center; justify-content: center;
@@ -993,8 +989,6 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.palco { position: relative; }
-
 /* mensagens do histórico entram escalonadas */
 .msg.escalonada { animation: msgEntra 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
@@ -1174,3 +1168,11 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
 .entrada-selos i { animation: respira 3.4s ease-in-out infinite; }
 
 #b-entrar:disabled { position: relative; }
+
+/* ------------------------------------------------------------------ *
+ * Quem prefere menos movimento
+ * ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
