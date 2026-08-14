@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0B1120" />
+<title>Sala &mdash; Conversas privadas que desaparecem</title>
+<meta name="description" content="Conversas cifradas ponta a ponta, por convite. Sem contas, sem n&uacute;meros de telefone, sem hist&oacute;rico. A conversa expira e desaparece." />
+<meta property="og:title" content="Sala &mdash; Conversas privadas que desaparecem" />
+<meta property="og:description" content="Cifrado ponta a ponta. Sem contas. A conversa expira sozinha." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%234F46E5'/><rect x='11' y='10' width='10' height='12' rx='3' fill='%23fff'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/sobre.css" />
+</head>
+<body>
+<div class="ambiente" aria-hidden="true"></div>
+
+<header class="topo">
+  <a class="marca" href="/sobre"><span class="marca-icone"></span>Sala</a>
+  <nav class="topo-links">
+    <a href="#como">Como funciona</a>
+    <a href="#privacidade">Privacidade</a>
+    <a class="topo-cta" href="/">Abrir a aplica&ccedil;&atilde;o</a>
+  </nav>
+</header>
+
+<main>
+
+  <section class="heroi">
+    <p class="etiqueta" data-anima><span class="ponto"></span>Cifrado ponta a ponta</p>
+    <h1 data-anima data-atraso="1">
+      Conversas que<br /><span class="realce">desaparecem</span>
+    </h1>
+    <p class="sub" data-anima data-atraso="2">
+      Sem contas. Sem n&uacute;meros de telefone. Sem hist&oacute;rico.<br />
+      Geras um link, entra uma pessoa, e a conversa expira sozinha.
+    </p>
+    <div class="heroi-accoes" data-anima data-atraso="3">
+      <a class="botao primario" href="/">Come&ccedil;ar uma conversa</a>
+      <a class="botao neutro" href="#como">Ver como funciona</a>
+    </div>
+
+    <div class="mostra" data-anima data-atraso="4">
+      <div class="janela">
+        <div class="janela-topo">
+          <span class="ponto-janela"></span><span class="ponto-janela"></span><span class="ponto-janela"></span>
+          <span class="janela-url">sala &middot; expira em 23h&nbsp;58m</span>
+        </div>
+        <div class="janela-vida"><span></span></div>
+        <div class="janela-corpo">
+          <div class="bolha esq" data-bolha="1">Recebeste o link?</div>
+          <div class="bolha dir" data-bolha="2">Sim. Isto expira mesmo?</div>
+          <div class="bolha esq" data-bolha="3">Em 24 horas desaparece tudo.</div>
+          <div class="a-escrever" data-bolha="4"><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="numeros" data-anima>
+    <div><strong>0</strong><span>contas criadas</span></div>
+    <div><strong>AES-256</strong><span>cifra no teu aparelho</span></div>
+    <div><strong>2</strong><span>pessoas por conversa</span></div>
+    <div><strong>1h &ndash; 7d</strong><span>e depois desaparece</span></div>
+  </section>
+
+  <section id="como" class="seccao">
+    <p class="titulo-seccao" data-anima>Como funciona</p>
+    <h2 data-anima>Tr&ecirc;s passos. Nada para instalar.</h2>
+
+    <ol class="passos">
+      <li data-anima data-atraso="1">
+        <span class="passo-n">01</span>
+        <h3>Geras um link</h3>
+        <p>Escolhes quanto tempo a conversa dura: uma hora, um dia ou uma semana. Recebes um link e um c&oacute;digo QR.</p>
+      </li>
+      <li data-anima data-atraso="2">
+        <span class="passo-n">02</span>
+        <h3>Convidas uma pessoa</h3>
+        <p>Envias o link por onde quiseres. Escreve o nome dela e entra. S&oacute; uma pessoa &mdash; a segunda &eacute; recusada.</p>
+      </li>
+      <li data-anima data-atraso="3">
+        <span class="passo-n">03</span>
+        <h3>Conversam. Depois desaparece.</h3>
+        <p>Mensagens, chamadas de voz e confirma&ccedil;&atilde;o de leitura. Quando o tempo acaba, apaga-se sozinho.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="privacidade" class="seccao">
+    <p class="titulo-seccao" data-anima>Privacidade</p>
+    <h2 data-anima>A chave nunca chega ao servidor.</h2>
+    <p class="lead-seccao" data-anima>
+      O link tem duas partes. A que o servidor v&ecirc;, e a que nunca lhe chega.
+    </p>
+
+    <div class="url-demo" data-anima data-atraso="1">
+      <code>
+        <span class="url-publica">sala.app/s/K7PQ2M</span><span class="url-corte">#k=</span><span class="url-secreta">Xy9a...bK2</span>
+      </code>
+      <div class="url-legenda">
+        <span><i class="pt publica"></i>Vai ao servidor</span>
+        <span><i class="pt secreta"></i>Nunca sai do teu aparelho</span>
+      </div>
+    </div>
+
+    <div class="cartoes">
+      <article data-anima data-atraso="1">
+        <div class="icone-cartao">
+          <svg viewBox="0 0 24 24" width="19" height="19"><path d="M7 10V7a5 5 0 0110 0v3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="10.5" rx="3" fill="currentColor"/></svg>
+        </div>
+        <h3>Cifrado antes de sair</h3>
+        <p>Cada mensagem &eacute; fechada &agrave; chave no teu browser com AES-GCM 256. O servidor recebe texto que n&atilde;o consegue ler.</p>
+      </article>
+      <article data-anima data-atraso="2">
+        <div class="icone-cartao">
+          <svg viewBox="0 0 24 24" width="19" height="19"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M12 7.5V12l3 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Apaga-se sozinho</h3>
+        <p>N&atilde;o &eacute; c&oacute;digo a limpar depois. A pr&oacute;pria base de dados esquece no prazo marcado, sem exce&ccedil;&otilde;es.</p>
+      </article>
+      <article data-anima data-atraso="3">
+        <div class="icone-cartao">
+          <svg viewBox="0 0 24 24" width="19" height="19"><path d="M4 6h16M4 12h10M4 18h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Nada a preencher</h3>
+        <p>Sem email, sem n&uacute;mero, sem perfil. N&atilde;o h&aacute; conta para invadir nem lista de contactos para vazar.</p>
+      </article>
+      <article data-anima data-atraso="4">
+        <div class="icone-cartao">
+          <svg viewBox="0 0 24 24" width="19" height="19"><path d="M6.6 10.8a15.1 15.1 0 006.6 6.6l2.2-2.2a1 1 0 011-.25 11.4 11.4 0 003.6.58 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.46.57 3.6a1 1 0 01-.25 1z" fill="currentColor"/></svg>
+        </div>
+        <h3>Chamadas directas</h3>
+        <p>A voz vai de um aparelho para o outro sem passar pelo servidor. Nem sequer existe algo para gravar.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="seccao">
+    <p class="titulo-seccao" data-anima>Ao certo</p>
+    <h2 data-anima>O que isto n&atilde;o faz.</h2>
+    <ul class="lista-honesta">
+      <li data-anima data-atraso="1">Quem tiver o link completo entra. Escolhe bem por onde o envias.</li>
+      <li data-anima data-atraso="2">A lista de conversas vive no teu browser. Se o limpares, perdes o acesso.</li>
+      <li data-anima data-atraso="3">Nada impede a outra pessoa de fotografar o ecr&atilde;. Isso nenhuma app resolve.</li>
+    </ul>
+  </section>
+
+  <section class="fim">
+    <div class="fim-caixa" data-anima>
+      <h2>Uma conversa. E depois nada.</h2>
+      <p>Leva menos de dez segundos a come&ccedil;ar.</p>
+      <a class="botao primario grande" href="/">Abrir a aplica&ccedil;&atilde;o</a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="rodape">
+  <span class="marca pequena"><span class="marca-icone"></span>Sala</span>
+  <span class="rodape-nota">Cifrado ponta a ponta &middot; sem contas &middot; sem hist&oacute;rico</span>
+</footer>
+
+<script src="/sobre.js"></script>
+</body>
+</html>
