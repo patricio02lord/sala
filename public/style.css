@@ -934,3 +934,10 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   transition: background 0.16s ease, color 0.16s ease;
 }
 .resposta-fechar:hover { background: var(--nivel-3); color: var(--texto); }
+
+
+.fechado-accoes {
+  display: flex; align-items: center; justify-content: center;
+  gap: 18px; margin-top: 8px; flex-wrap: wrap;
+}
+.fechado-accoes a.ligacao-peq { text-decoration: none; }
