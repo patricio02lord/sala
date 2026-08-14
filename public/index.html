@@ -56,7 +56,10 @@
         </button>
         <div class="avatar peq" id="avatar-sala">&middot;</div>
         <div class="cabecalho-info">
+          <div class="titulo-linha">
           <p id="titulo-sala" class="titulo-sala">Conversa</p>
+          <span id="presenca-ponto" class="presenca-ponto" aria-hidden="true"></span>
+          </div>
           <p id="conta" class="sub"></p>
         </div>
         <span class="selo so-ecra-largo" title="Cifrado ponta a ponta">
@@ -75,6 +78,13 @@
           <button id="b-fechar" class="perigo">Apagar conversa</button>
         </div>
       </header>
+
+      <div id="ligando" class="ligando oculto" role="status">
+        <div class="ligando-avatar" id="ligando-avatar">&middot;</div>
+        <p class="ligando-nome" id="ligando-nome"></p>
+        <p class="ligando-passo" id="ligando-passo">A estabelecer liga&ccedil;&atilde;o segura</p>
+        <div class="ligando-barra"><span id="ligando-progresso"></span></div>
+      </div>
 
       <div id="vida" class="vida" role="presentation"><span id="vida-barra"></span></div>
 
@@ -96,9 +106,24 @@
         <div class="col-larga">
           <div id="cifra-nota" class="cifra-nota">Cifrado ponta a ponta</div>
           <div id="mensagens"></div>
+          <div id="vazio-conversa" class="vazio-conversa oculto">
+            <div class="fantasma esq"></div>
+            <div class="fantasma dir"></div>
+            <div class="fantasma esq curto"></div>
+            <p>Ainda n&atilde;o disseram nada.<br />Escreve a primeira mensagem.</p>
+          </div>
+          <div id="a-escrever" class="a-escrever-caixa oculto" role="status">
+            <div class="pontos"><span></span><span></span><span></span></div>
+            <span id="a-escrever-nome" class="a-escrever-nome"></span>
+          </div>
           <div id="fim"></div>
         </div>
       </section>
+
+      <button id="ir-fim" class="ir-fim oculto" aria-label="Ir para o fim">
+        <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 3v9m0 0l4-4m-4 4l-4-4" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="ir-fim-n" class="ir-fim-n oculto"></span>
+      </button>
 
       <footer>
         <div id="resposta" class="resposta oculto">
@@ -206,14 +231,18 @@
 <!-- BOAS-VINDAS -->
 <main id="v-entrada" class="ecra centrado oculto">
   <div class="col estreita cartao">
-    <div class="avatar" id="avatar-anfitriao">?</div>
+    <div class="avatar-onda"><div class="avatar" id="avatar-anfitriao">?</div></div>
     <h1 id="titulo-entrada" class="titulo-entrada">Bem-vindo</h1>
     <p id="info-entrada" class="lead centro">A confirmar a conversa&hellip;</p>
 
     <div id="form-entrada" class="oculto">
       <input id="nome-entrada" maxlength="20" placeholder="Escreve o teu nome" autocomplete="off" enterkeyhint="go" class="grande" />
       <button id="b-entrar" class="principal larga">Entrar</button>
-      <p class="nota centro">Sem conta e sem n&uacute;mero de telefone.</p>
+      <div class="entrada-selos">
+        <span><i></i>Cifrado ponta a ponta</span>
+        <span><i></i>Sem conta nem n&uacute;mero de telefone</span>
+        <span><i></i>Apaga-se sozinha no fim do tempo</span>
+      </div>
     </div>
 
     <p id="e-entrada" class="erro centro" role="alert"></p>
