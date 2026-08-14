@@ -941,3 +941,236 @@ input.grande { padding: 12px 14px; font-size: 15px; text-align: center; }
   gap: 18px; margin-top: 8px; flex-wrap: wrap;
 }
 .fechado-accoes a.ligacao-peq { text-decoration: none; }
+
+/* ------------------------------------------------------------------ *
+ * Entrada na conversa
+ * ------------------------------------------------------------------ */
+
+.ligando {
+  position: absolute; inset: 0; z-index: 30;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: var(--fundo);
+  animation: entrada 0.3s ease both;
+}
+.ligando.a-sair { animation: sairLigando 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes sairLigando { to { opacity: 0; transform: scale(1.02); visibility: hidden; } }
+
+.ligando-avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 60px; height: 60px; border-radius: 50%;
+  background: var(--nivel-3); color: var(--texto);
+  font-size: 22px; font-weight: 500; text-transform: uppercase;
+  margin-bottom: 18px; position: relative;
+}
+.ligando-avatar::before,
+.ligando-avatar::after {
+  content: ""; position: absolute; inset: 0;
+  border-radius: 50%; border: 1px solid var(--acento-luz);
+  animation: onda 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.ligando-avatar::after { animation-delay: 1.2s; }
+@keyframes onda {
+  from { opacity: 0.5; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.75); }
+}
+
+.ligando-nome { font-size: 16px; font-weight: 500; margin: 0 0 5px; }
+.ligando-passo {
+  font-size: 13px; color: var(--texto-3); margin: 0 0 22px;
+  transition: opacity 0.25s ease;
+}
+.ligando-passo.a-trocar { opacity: 0; }
+
+.ligando-barra {
+  width: 168px; height: 2px; border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06); overflow: hidden;
+}
+.ligando-barra span {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--acento), var(--acento-luz));
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.55);
+  transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.palco { position: relative; }
+
+/* mensagens do histórico entram escalonadas */
+.msg.escalonada { animation: msgEntra 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* barra de escrita chega no fim da sequência */
+.sala footer { transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease; }
+.sala.a-entrar footer { transform: translateY(100%); opacity: 0; }
+
+/* ------------------------------------------------------------------ *
+ * Presença
+ * ------------------------------------------------------------------ */
+
+.titulo-linha { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.titulo-linha .titulo-sala { min-width: 0; }
+
+.presenca-ponto {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  background: var(--texto-3);
+  transition: background 0.35s ease, box-shadow 0.35s ease;
+}
+.presenca-ponto.online {
+  background: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.16);
+}
+
+/* ------------------------------------------------------------------ *
+ * Estado vazio da conversa
+ * ------------------------------------------------------------------ */
+
+.vazio-conversa {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 22px 0 10px; text-align: center;
+}
+.fantasma {
+  height: 34px; border-radius: 14px; width: 52%;
+  background: linear-gradient(90deg, var(--nivel-1), var(--nivel-2), var(--nivel-1));
+  background-size: 220% 100%;
+  border: 1px solid var(--linha);
+  animation: brilho 3.2s ease-in-out infinite;
+  opacity: 0.45;
+}
+.fantasma.dir { margin-left: auto; width: 44%; border-top-right-radius: 5px; animation-delay: 0.5s; }
+.fantasma.esq { border-top-left-radius: 5px; }
+.fantasma.curto { width: 34%; animation-delay: 1s; }
+@keyframes brilho { 50% { background-position: 100% 0; } }
+.vazio-conversa p {
+  font-size: 13.5px; line-height: 1.65; color: var(--texto-3);
+  margin: 20px 0 0;
+}
+
+/* ------------------------------------------------------------------ *
+ * Está a escrever
+ * ------------------------------------------------------------------ */
+
+.a-escrever-caixa {
+  display: flex; align-items: center; gap: 9px;
+  width: fit-content; margin: 4px 0 10px;
+  padding: 9px 13px;
+  background: var(--nivel-2); border: 1px solid var(--linha);
+  border-radius: var(--r-gra); border-top-left-radius: 5px;
+  animation: msgEntra 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.pontos { display: flex; align-items: center; gap: 4px; }
+.pontos span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--texto-2); animation: saltar 1.3s ease-in-out infinite;
+}
+.pontos span:nth-child(2) { animation-delay: 0.16s; }
+.pontos span:nth-child(3) { animation-delay: 0.32s; }
+@keyframes saltar {
+  0%, 60%, 100% { transform: none; opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+.a-escrever-nome { font-size: 12px; color: var(--texto-3); }
+
+/* ------------------------------------------------------------------ *
+ * Envio otimista
+ * ------------------------------------------------------------------ */
+
+.msg.pendente .balao { opacity: 0.58; }
+.msg.pendente .hora::after {
+  content: ""; width: 9px; height: 9px; margin-left: 2px;
+  border: 1.4px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; display: inline-block;
+  animation: rodar 0.7s linear infinite;
+}
+@keyframes rodar { to { transform: rotate(360deg); } }
+
+.msg.falhou .balao {
+  background: var(--nivel-2);
+  border-color: rgba(255, 255, 255, 0.14);
+  border-style: dashed;
+}
+.msg.falhou .corpo { color: var(--texto-2); }
+.repetir {
+  display: block; margin-top: 5px; padding: 0;
+  font-size: 11.5px; color: var(--acento-luz);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Separadores de dia
+ * ------------------------------------------------------------------ */
+
+.dia {
+  position: sticky; top: 0; z-index: 6;
+  display: flex; justify-content: center;
+  margin: 18px 0 14px; pointer-events: none;
+}
+.dia span {
+  padding: 4px 12px;
+  font-size: 11.5px; font-weight: 500; color: var(--texto-3);
+  background: rgba(11, 17, 32, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--linha); border-radius: 20px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Voltar ao fim
+ * ------------------------------------------------------------------ */
+
+.ir-fim {
+  position: absolute; right: 20px; bottom: 92px; z-index: 15;
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 50%;
+  color: var(--texto); background: var(--nivel-3);
+  border: 1px solid var(--linha);
+  box-shadow: var(--sombra-2);
+  animation: entrada 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: background 0.16s ease, transform 0.14s ease;
+}
+.ir-fim:hover { background: #212d45; }
+.ir-fim:active { transform: scale(0.93); }
+.ir-fim-n {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--acento); color: #fff;
+  font-size: 11px; font-weight: 600; border-radius: 9px;
+  border: 2px solid var(--fundo);
+}
+
+@media (max-width: 860px) {
+  .ir-fim { right: 14px; bottom: 88px; }
+}
+
+/* ------------------------------------------------------------------ *
+ * Boas-vindas do convidado
+ * ------------------------------------------------------------------ */
+
+.avatar-onda { position: relative; width: fit-content; margin: 0 auto 22px; }
+.avatar-onda .avatar { margin: 0; position: relative; z-index: 1; }
+.avatar-onda::before,
+.avatar-onda::after {
+  content: ""; position: absolute; inset: 0;
+  border-radius: 50%; border: 1px solid var(--acento-luz);
+  animation: onda 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.avatar-onda::after { animation-delay: 1.5s; }
+
+.entrada-selos {
+  display: flex; flex-direction: column; gap: 9px;
+  margin: 22px 0 0; padding-top: 18px;
+  border-top: 1px solid var(--linha);
+  text-align: left;
+}
+.entrada-selos span {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 12.5px; color: var(--texto-3);
+}
+.entrada-selos i {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--acento-luz); flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.12);
+}
+.entrada-selos span:nth-child(2) i { animation-delay: 0.4s; }
+.entrada-selos span:nth-child(3) i { animation-delay: 0.8s; }
+.entrada-selos i { animation: respira 3.4s ease-in-out infinite; }
+
+#b-entrar:disabled { position: relative; }
