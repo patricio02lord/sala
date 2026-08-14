@@ -340,7 +340,10 @@ function garantirSocket() {
   socket.on("presenca", ({ code, n }) => {
     const s = vivas.get(code);
     if (s) s.pessoas = n;
-    if (code === activa) actualizarSub();
+    if (code !== activa) return;
+    actualizarSub();
+    $("presenca-ponto").classList.toggle("online", n >= 2);
+    if (n < 2) mostrarEscrita("", false);
   });
 
   socket.on("sala:fechada", ({ code, motivo }) => {
@@ -352,6 +355,17 @@ function garantirSocket() {
     vivas.delete(code);
     esquecerSala(code);
     desenharLista();
+  });
+
+  socket.on("escrevendo", async ({ code, ct }) => {
+    if (code !== activa) return;
+    const s = vivas.get(code);
+    if (!s) return;
+    try {
+      const c = await decifrar(ct, s.chave);
+      if (c.n === nome) return;
+      mostrarEscrita(c.n, !!c.on);
+    } catch {}
   });
 
   socket.on("sinal", receberSinal);
@@ -381,7 +395,12 @@ function entrarNaConversa(code) {
     s.iniciada = true;
     s.msgs = [];
     for (const m of r.historico) await receber(code, m, true);
-    if (code === activa) { desenharConversa(); avisarQueVi(code); }
+    if (code === activa) {
+      passoLigacao(2, 88);
+      desenharConversa(true);
+      esconderLigacao();
+      avisarQueVi(code);
+    }
     if (!jaTinha) {
       try { socket.emit("mensagem", { code, ct: await cifrar({ n: nome, tipo: "entrada" }, s.chave) }); } catch {}
     }
@@ -424,9 +443,12 @@ async function receber(code, msg, doHistorico) {
   const nova = !doHistorico && item.autor !== nome && item.tipo !== "entrada";
 
   if (code === activa) {
+    const estavaNoFim = noFim();
     pintar(item, s);
+    if (!estavaNoFim && item.autor !== nome) { porVer++; actualizarIrFim(); }
     if (nova) {
       avisarQueVi(code);
+      mostrarEscrita("", false);
       som.recebida();
       if (abaEscondida()) { s.novas = (s.novas || 0) + 1; actualizarAba(); }
     }
@@ -462,6 +484,131 @@ function marcarVistas(s) {
     if (visto) ultimaVista = el;
   });
   if (ultimaVista) ultimaVista.classList.add("ultima-vista");
+}
+
+/* ---------- Estados da conversa ---------- */
+
+const PASSOS_LIGACAO = [
+  "A estabelecer ligação segura",
+  "A verificar a chave",
+  "A carregar a conversa",
+];
+
+function mostrarLigacao(nomeOutro) {
+  const el = $("ligando");
+  el.classList.remove("oculto", "a-sair");
+  $("v-sala").classList.add("a-entrar");
+  $("ligando-avatar").textContent = inicial(nomeOutro || "?");
+  $("ligando-avatar").style.background = corDe(nomeOutro || activa);
+  $("ligando-nome").textContent = nomeOutro || "Conversa privada";
+  $("ligando-passo").textContent = PASSOS_LIGACAO[0];
+  $("ligando-progresso").style.width = "18%";
+}
+
+function passoLigacao(i, percentagem) {
+  const p = $("ligando-passo");
+  p.classList.add("a-trocar");
+  setTimeout(() => {
+    p.textContent = PASSOS_LIGACAO[i] || PASSOS_LIGACAO[2];
+    p.classList.remove("a-trocar");
+  }, 200);
+  $("ligando-progresso").style.width = percentagem + "%";
+}
+
+function esconderLigacao() {
+  const el = $("ligando");
+  if (el.classList.contains("oculto")) return;
+  $("ligando-progresso").style.width = "100%";
+  setTimeout(() => {
+    el.classList.add("a-sair");
+    $("v-sala").classList.remove("a-entrar");
+    setTimeout(() => el.classList.add("oculto"), 460);
+  }, 240);
+}
+
+/* --- está a escrever --- */
+
+let avisoEscrita = 0, pararEscrita = null, escondeEscrita = null;
+
+async function avisarQueEscrevo() {
+  const s = vivas.get(activa);
+  if (!s || !socket?.connected) return;
+  const agora = Date.now();
+  if (agora - avisoEscrita < 2200) return;
+  avisoEscrita = agora;
+  try { socket.emit("escrevendo", { code: activa, ct: await cifrar({ n: nome, on: true }, s.chave) }); } catch {}
+  clearTimeout(pararEscrita);
+  pararEscrita = setTimeout(pararDeEscrever, 3200);
+}
+
+async function pararDeEscrever() {
+  const s = vivas.get(activa);
+  if (!s || !socket?.connected) return;
+  avisoEscrita = 0;
+  clearTimeout(pararEscrita);
+  try { socket.emit("escrevendo", { code: activa, ct: await cifrar({ n: nome, on: false }, s.chave) }); } catch {}
+}
+
+function mostrarEscrita(quem, ligado) {
+  const el = $("a-escrever");
+  clearTimeout(escondeEscrita);
+  if (!ligado) { el.classList.add("oculto"); return; }
+  $("a-escrever-nome").textContent = quem;
+  el.classList.remove("oculto");
+  if (noFim()) $("fim").scrollIntoView({ behavior: "smooth", block: "end" });
+  escondeEscrita = setTimeout(() => el.classList.add("oculto"), 5000);
+}
+
+/* --- posição do deslize --- */
+
+let porVer = 0;
+
+const noFim = () => {
+  const f = $("fluxo");
+  return f.scrollHeight - f.scrollTop - f.clientHeight < 120;
+};
+
+function actualizarIrFim() {
+  const mostrar = !noFim();
+  $("ir-fim").classList.toggle("oculto", !mostrar);
+  if (!mostrar) { porVer = 0; }
+  $("ir-fim-n").classList.toggle("oculto", porVer === 0);
+  $("ir-fim-n").textContent = porVer > 9 ? "9+" : String(porVer);
+}
+
+escutar("fluxo", "scroll", actualizarIrFim);
+escutar("ir-fim", "click", () => {
+  $("fim").scrollIntoView({ behavior: "smooth", block: "end" });
+  porVer = 0;
+  actualizarIrFim();
+});
+
+/* --- separadores de dia --- */
+
+function rotuloDia(t) {
+  const d = new Date(t), hoje = new Date();
+  const mesmoDia = (a, b) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  if (mesmoDia(d, hoje)) return "Hoje";
+  const ontem = new Date(hoje);
+  ontem.setDate(hoje.getDate() - 1);
+  if (mesmoDia(d, ontem)) return "Ontem";
+  return d.toLocaleDateString("pt-PT", { day: "numeric", month: "long" });
+}
+
+let ultimoDia = null;
+
+function marcarDia(t) {
+  const rotulo = rotuloDia(t);
+  if (rotulo === ultimoDia) return;
+  ultimoDia = rotulo;
+  const d = document.createElement("div");
+  d.className = "dia";
+  const sp = document.createElement("span");
+  sp.textContent = rotulo;
+  d.append(sp);
+  $("mensagens").append(d);
+  ultimoAutor = null;
 }
 
 /* ---------- Responder a uma mensagem ---------- */
@@ -595,6 +742,8 @@ function sistema(txt) {
 }
 
 function pintar(item, s) {
+  $("vazio-conversa").classList.add("oculto");
+  marcarDia(item.t);
   if (item.tipo === "entrada") {
     sistema(`${item.autor} entrou.`);
     return;
@@ -602,6 +751,8 @@ function pintar(item, s) {
   const div = document.createElement("div");
   div.className = "msg";
   div.dataset.id = item.id;
+  if (item.pendente) div.classList.add("pendente");
+  if (item.falhou) div.classList.add("falhou");
   const minha = !item.ilegivel && item.autor === nome;
   if (item.apagada) div.classList.add("apagada");
   if (minha) div.classList.add("minha");
@@ -661,7 +812,15 @@ function pintar(item, s) {
       "</svg>";
     h.append(v);
   }
-  balao.append(p, h);
+  if (item.falhou) {
+    const rep = document.createElement("button");
+    rep.className = "repetir";
+    rep.textContent = "Não enviou. Tentar de novo";
+    rep.addEventListener("click", (e) => { e.stopPropagation(); reenviar(item, s); });
+    balao.append(p, rep, h);
+  } else {
+    balao.append(p, h);
+  }
   div.append(balao);
   div.dataset.t = item.t;
 
@@ -712,14 +871,29 @@ function pintar(item, s) {
   $("fim").scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
-function desenharConversa() {
+function desenharConversa(escalonar) {
   const s = vivas.get(activa);
   if (!s) return;
   $("mensagens").textContent = "";
-  ultimoAutor = null; ultimoElemento = null;
+  ultimoAutor = null; ultimoElemento = null; ultimoDia = null;
+
+  const reais = s.msgs.filter((m) => m.tipo !== "entrada");
+  $("vazio-conversa").classList.toggle("oculto", reais.length > 0);
+
   for (const m of s.msgs) pintar(m, s);
+
+  if (escalonar) {
+    const balas = [...document.querySelectorAll("#mensagens .msg")].slice(-8);
+    balas.forEach((el, i) => {
+      el.classList.add("escalonada");
+      el.style.animationDelay = (i * 45) + "ms";
+      setTimeout(() => { el.style.animationDelay = ""; el.classList.remove("escalonada"); }, 500 + i * 45);
+    });
+  }
+
   marcarVistas(s);
   $("fim").scrollIntoView({ block: "end" });
+  actualizarIrFim();
 }
 
 function desenharCabecalho() {
@@ -733,8 +907,10 @@ function desenharCabecalho() {
 function actualizarSub() {
   const s = vivas.get(activa);
   if (!s) return;
-  const p = s.pessoas === undefined ? "" : s.pessoas <= 1 ? "Só tu · " : "2 online · ";
+  const outro = s.para || "a outra pessoa";
+  const p = s.pessoas === undefined ? "" : s.pessoas >= 2 ? "Online · " : `${outro} ausente · `;
   $("conta").textContent = `${p}expira em ${restante(s.expira)}`;
+  $("presenca-ponto").classList.toggle("online", (s.pessoas || 0) >= 2);
 }
 
 async function abrirConversa(code) {
@@ -743,7 +919,7 @@ async function abrirConversa(code) {
     if (g) {
       try {
         vivas.set(code, {
-          chave: await importarChave(g.k), k: g.k, para: g.para || "",
+          code, chave: await importarChave(g.k), k: g.k, para: g.para || "",
           criada: g.criada, expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
         });
         entrarNaConversa(code);
@@ -765,7 +941,16 @@ async function abrirConversa(code) {
   desenharCabecalho();
   actualizarSub();
   desenharVida();
-  desenharConversa();
+
+  if (!s.iniciada) {
+    mostrarLigacao(s.para);
+    setTimeout(() => passoLigacao(1, 55), 380);
+  } else {
+    $("ligando").classList.add("oculto");
+    $("v-sala").classList.remove("a-entrar");
+  }
+
+  desenharConversa(s.iniciada);
   avisarQueVi(code);
   desenharLista();
   if (chamada.estado !== "parado" && chamada.code === code) ecraChamada(chamada.estado, $("chamada-estado").textContent);
@@ -788,19 +973,74 @@ async function enviar() {
   const txt = $("texto").value.trim();
   const s = vivas.get(activa);
   if (!txt || !s) return;
-  if (!socket?.connected) return erro("e-sala", "Sem ligação. Espera um instante.");
   $("texto").value = "";
   $("texto").style.height = "auto";
   som.enviada();
+  pararDeEscrever();
+
   const corpo = { n: nome, txt };
   if (aResponder) corpo.resp = aResponder;
   cancelarResposta();
-  try {
-    socket.emit("mensagem", { code: activa, ct: await cifrar(corpo, s.chave) },
-      (r) => erro("e-sala", r?.ok ? "" : r?.erro));
-  } catch {
-    erro("e-sala", "Não foi possível enviar.");
+
+  // a mensagem aparece já; a confirmação chega depois
+  const local = {
+    id: "local-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    t: Date.now(), autor: nome, txt, tipo: "", ilegivel: false,
+    editada: 0, apagada: 0, resp: corpo.resp || null,
+    pendente: true, falhou: false, corpo,
+  };
+  s.msgs.push(local);
+  if (activa === s.code || vivas.get(activa) === s) pintar(local, s);
+  $("fim").scrollIntoView({ behavior: "smooth", block: "end" });
+
+  entregar(local, s);
+}
+
+function estadoLocal(local, s, mudar) {
+  Object.assign(local, mudar);
+  const el = document.querySelector(`#mensagens .msg[data-id="${CSS.escape(local.id)}"]`);
+  if (!el) return;
+  el.classList.toggle("pendente", !!local.pendente);
+  el.classList.toggle("falhou", !!local.falhou);
+  if (local.falhou && !el.querySelector(".repetir")) {
+    const rep = document.createElement("button");
+    rep.className = "repetir";
+    rep.textContent = "Não enviou. Tentar de novo";
+    rep.addEventListener("click", (e) => { e.stopPropagation(); reenviar(local, s); });
+    el.querySelector(".balao")?.insertBefore(rep, el.querySelector(".hora"));
   }
+}
+
+async function entregar(local, s) {
+  if (!socket?.connected) return estadoLocal(local, s, { pendente: false, falhou: true });
+  let respondeu = false;
+  const prazo = setTimeout(() => {
+    if (!respondeu) estadoLocal(local, s, { pendente: false, falhou: true });
+  }, 8000);
+  try {
+    socket.emit("mensagem", { code: s.code || activa, ct: await cifrar(local.corpo, s.chave) }, (r) => {
+      respondeu = true;
+      clearTimeout(prazo);
+      if (r?.ok) {
+        // o eco do servidor traz a mensagem verdadeira; esta sai
+        const i = s.msgs.indexOf(local);
+        if (i >= 0) s.msgs.splice(i, 1);
+        document.querySelector(`#mensagens .msg[data-id="${CSS.escape(local.id)}"]`)?.remove();
+      } else {
+        estadoLocal(local, s, { pendente: false, falhou: true });
+        erro("e-sala", r?.erro || "");
+      }
+    });
+  } catch {
+    clearTimeout(prazo);
+    estadoLocal(local, s, { pendente: false, falhou: true });
+  }
+}
+
+function reenviar(local, s) {
+  estadoLocal(local, s, { pendente: true, falhou: false });
+  document.querySelector(`#mensagens .msg[data-id="${CSS.escape(local.id)}"] .repetir`)?.remove();
+  entregar(local, s);
 }
 
 escutar("b-enviar", "click", enviar);
@@ -812,6 +1052,7 @@ escutar("texto", "keydown", (e) => {
 escutar("texto", "input", (e) => {
   e.target.style.height = "auto";
   e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+  if (e.target.value.trim()) avisarQueEscrevo(); else pararDeEscrever();
 });
 
 /* ---------- Criar ---------- */
@@ -843,7 +1084,7 @@ async function criarSala() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.erro);
 
-    vivas.set(d.code, { chave, k, para: "", criada: d.criadaEm, expira: d.expiraEm, msgs: [], novas: 0, dono: true });
+    vivas.set(d.code, { code: d.code, chave, k, para: "", criada: d.criadaEm, expira: d.expiraEm, msgs: [], novas: 0, dono: true });
     guardarSala({ code: d.code, k, para: "", criada: d.criadaEm, expira: d.expiraEm, dono: true });
     entrarNaConversa(d.code);
 
@@ -1186,9 +1427,11 @@ function entrarPorConvite() {
   if (!n) return erro("e-entrada", "Escreve o teu nome para continuar.");
   if (!convite?.code) return;
   nome = n; guardarNome(n); erro("e-entrada", "");
+  $("b-entrar").disabled = true;
+  $("b-entrar").textContent = "A entrar…";
 
   const { code, k, chave, criada, expira, dono } = convite;
-  vivas.set(code, { chave, k, para: dono, criada, expira, msgs: [], novas: 0, dono: false });
+  vivas.set(code, { code, chave, k, para: dono, criada, expira, msgs: [], novas: 0, dono: false });
   guardarSala({ code, k, para: dono, criada, expira, dono: false });
   entrarNaConversa(code);
   modoConvidado();
@@ -1490,7 +1733,7 @@ async function restaurar() {
   for (const g of guardadas) {
     try {
       vivas.set(g.code, {
-        chave: await importarChave(g.k), k: g.k, para: g.para || "",
+        code: g.code, chave: await importarChave(g.k), k: g.k, para: g.para || "",
         criada: g.criada, expira: g.expira, msgs: [], novas: 0, dono: !!g.dono,
       });
     } catch {}
